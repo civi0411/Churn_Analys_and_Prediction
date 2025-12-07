@@ -30,7 +30,7 @@ class EDAVisualizer:
         fig.savefig(path, bbox_inches='tight', dpi=300)
         plt.close(fig)
         if self.logger:
-            self.logger.info(f"Saved plot: {path}")
+            self.logger.info(f"Saved Plot      | EDA        | {filename}")
 
     def plot_target_distribution(self, y: pd.Series):
         """Vẽ biểu đồ Donut Chart cho Target"""
@@ -53,7 +53,7 @@ class EDAVisualizer:
 
         ax.set_title(f"Target Distribution: {y.name}", fontsize=14, fontweight='bold')
         plt.tight_layout()
-        self._save_plot(fig, "target_distribution_donut.png")
+        self._save_plot(fig, "target_distribution.png")
 
     def plot_missing_values(self, df: pd.DataFrame):
         """Biểu đồ cột thể hiện % Missing Data"""

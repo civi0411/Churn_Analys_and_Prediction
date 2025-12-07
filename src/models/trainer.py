@@ -68,7 +68,6 @@ class ModelTrainer:
         if train_path is None or test_path is None:
             train_test_dir = self.config['data']['train_test_dir']
             raw_filename = self.config['data'].get('raw_path')
-            if self.logger: self.logger.info("Auto-detecting latest train/test files...")
             train_path, test_path = get_latest_train_test(train_test_dir, raw_filename)
 
         train_df = IOHandler.read_data(train_path)
@@ -81,7 +80,9 @@ class ModelTrainer:
         self.y_test = test_df[target_col]
 
         if self.logger:
-            self.logger.info(f"Data Loaded | Train: {self.X_train.shape} | Test: {self.X_test.shape}")
+            self.logger.info(f"Train Loaded  | {os.path.basename(train_path)}")
+            self.logger.info(f"Test Loaded   | {os.path.basename(test_path)}")
+            self.logger.info(f"Data Shape    | Train: {self.X_train.shape} | Test: {self.X_test.shape}")
 
     # ==================== MODEL FACTORY ====================
 
@@ -156,14 +157,23 @@ class ModelTrainer:
         self.models[model_name] = best_model
         return best_model, best_params
 
+    def set_sampler(self, sampler: Any) -> None:
+        """Inject sampler cho imbalanced data handling"""
+        self.sampler = sampler
+        if self.logger:
+            sampler_name = type(sampler).__name__ if sampler else 'None'
+            self.logger.info(f"Resampler Injected | Type: {sampler_name}")
+
     def train_all_models(self, optimize: bool = True, sampler: Any = None) -> Dict[str, Dict]:
         """Train tất cả models trong config"""
         model_names = list(self.config.get('models', {}).keys())
         if not model_names: raise ValueError("No models defined in config")
 
+
         if self.logger:
+            sampler_name = type(sampler).__name__ if sampler else 'None'
             self.logger.info("=" * 70)
-            self.logger.info(f"BATCH TRAINING | Models: {len(model_names)} | Optimize: {optimize}")
+            self.logger.info(f"BATCH TRAINING | Models: {len(model_names)} | Optimize: {optimize} | Sampler: {sampler_name}")
             self.logger.info("=" * 70)
 
         all_metrics = {}
@@ -190,6 +200,16 @@ class ModelTrainer:
         return all_metrics
 
     # ==================== HELPERS ====================
+
+    def evaluate(self, model_name: str) -> Dict:
+        """Evaluate single model (dùng cho single model training từ pipeline)"""
+        model = self.models.get(model_name)
+        if not model:
+            raise ValueError(f"Model {model_name} not found")
+
+        eval_result = self.evaluator.evaluate(model, self.X_test, self.y_test, model_name)
+        self.results[model_name] = eval_result
+        return eval_result
 
     def select_best_model(self, all_metrics: Dict[str, Dict]) -> None:
         """Chọn model tốt nhất"""

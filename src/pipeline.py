@@ -98,7 +98,7 @@ class Pipeline:
             self.eda_viz.plot_numerical_distributions(df, numerical_cols)
             self.eda_viz.plot_outliers_boxplot(df, numerical_cols)
 
-        self.logger.info("EDA Completed.")
+        self.logger.info(f"EDA Completed. Check {self.eda_viz.eda_dir}")
 
     # =========================================================================
     # STAGE 2: PREPROCESSING (Clean -> Split -> Transform)
@@ -117,7 +117,7 @@ class Pipeline:
         # 1. DataOps: Version tracking
         source_path = self.config['data'].get('batch_folder') if raw_path.lower() == 'full' else raw_path
         ver_id = self.versioning.create_version(source_path)
-        self.logger.info(f"Data Version Created | ID: {ver_id}")
+        self.logger.info(f"Data Version  | {ver_id}")
 
         # 2. Load
         if raw_path.lower() == 'full':
@@ -139,7 +139,8 @@ class Pipeline:
         train_df, test_df = self.preprocessor.split_data(df_clean)
 
         # 5. Transform (Stateful - Fit on Train, Transform on Test)
-        self.logger.info("Fitting and transforming features...")
+        self.logger.info("=" * 60)
+        self.logger.info("STAGE 3: FIT & TRANSFORM")
         X_train, y_train = self.transformer.fit_transform(train_df)
         X_test, y_test = self.transformer.transform(test_df)
 
@@ -159,8 +160,13 @@ class Pipeline:
         IOHandler.save_data(train_processed, train_path)
         IOHandler.save_data(test_processed, test_path)
 
+        self.logger.info(f"Saved: {train_path} ({train_processed.shape})")
+        self.logger.info(f"Saved: {test_path} ({test_processed.shape})")
+
         # 7. Validate Output Quality
-        self.logger.info("--- Data Quality Check (Train Set) ---")
+        self.logger.info("=" * 60)
+        self.logger.info("PREPROCESSING COMPLETED")
+        self.logger.info(" --- Data Quality Check ---")
         self.validator.validate_quality(train_processed)
 
         return processed_path, train_path, test_path
@@ -287,7 +293,6 @@ class Pipeline:
             if self.config.get('explainability', {}).get('enabled', False):
                 try:
                     import numpy as np
-                    self.logger.info("Running SHAP explanation...")
                     # Lấy feature names từ columns của X_train (đã transform)
                     X_train_numeric = trainer.X_train.select_dtypes(include=[np.number])
                     feature_names = X_train_numeric.columns.tolist()
@@ -295,14 +300,18 @@ class Pipeline:
                     explainer = ModelExplainer(
                         trainer.best_model,
                         trainer.X_train,
-                        feature_names
+                        feature_names,
+                        logger=self.logger  # Truyền logger
                     )
 
                     # SHAP explanation on sample
-                    X_sample = trainer.X_test.head(100).select_dtypes(include=[np.number])
+                    shap_samples = self.config.get('explainability', {}).get('shap_samples', 100)
+                    X_sample = trainer.X_test.head(shap_samples).select_dtypes(include=[np.number])
                     shap_path = os.path.join(self.eval_viz.eval_dir, 'shap_summary.png')
-                    explainer.explain_with_shap(X_sample, shap_path)
-                    self.logger.info(f"SHAP Plot Saved | {shap_path}")
+
+                    success = explainer.explain_with_shap(X_sample, shap_path)
+                    if not success:
+                        self.logger.warning("SHAP plot was not generated")
 
                 except Exception as e:
                     self.logger.warning(f"Explainability failed: {e}")
@@ -424,6 +433,9 @@ class Pipeline:
                 if trainer.best_model_name:
                     self.tracker.log_metrics(metrics[trainer.best_model_name])
 
+                # 5. Final Summary
+                self._log_training_summary(trainer, metrics)
+
                 self.tracker.end_run("FINISHED")
                 return trainer, metrics
 
@@ -449,3 +461,14 @@ class Pipeline:
             if trainer.best_model:
                 model_path = os.path.join(models_dir, f"{trainer.best_model_name}.joblib")
                 IOHandler.save_model(trainer.best_model, model_path)
+
+    def _log_training_summary(self, trainer: ModelTrainer, metrics: Dict) -> None:
+        """Log training results summary theo format chuẩn"""
+        self.logger.info("=" * 60)
+        self.logger.info("TRAINING RESULTS")
+        self.logger.info(f"   Best Model: {trainer.best_model_name}")
+        for model_name, model_metrics in metrics.items():
+            self.logger.info(f"   {model_name}: {model_metrics}")
+        self.logger.info("=" * 60)
+        self.logger.info("[SUCCESS] Pipeline Finished.")
+

@@ -42,10 +42,14 @@ class DataTransformer:
 
     def fit_transform(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """Dùng cho tập TRAIN: Học tham số và biến đổi"""
+        if self.logger:
+            self.logger.info(f"Fit Transform | Input Shape: {df.shape}")
         return self._process(df, is_training=True)
 
     def transform(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """Dùng cho tập TEST: Áp dụng tham số đã học"""
+        if self.logger:
+            self.logger.info(f"Transform     | Input Shape: {df.shape}")
         return self._process(df, is_training=False)
 
     def _process(self, df: pd.DataFrame, is_training: bool) -> Tuple[pd.DataFrame, pd.Series]:
@@ -248,7 +252,7 @@ class DataTransformer:
         selected_cols = [col for col, selected in zip(X.columns, selector.get_support()) if selected]
 
         if self.logger:
-            self.logger.info(f"Selected {len(selected_cols)} features")
+            self.logger.info(f"Feature Select | Method: {method} | Selected: {len(selected_cols)}/{X.shape[1]}")
 
         return pd.DataFrame(X_new, columns=selected_cols, index=X.index), selected_cols
 
@@ -258,12 +262,16 @@ class DataTransformer:
             return None
 
         if not IMBLEARN_AVAILABLE:
-            if self.logger: self.logger.warning("Imblearn not installed. Skipping SMOTE.")
+            if self.logger:
+                self.logger.warning("Imblearn not installed. Skipping SMOTE.")
             return None
 
         k = self.config.get('preprocessing', {}).get('k_neighbors', 5)
         use_tomek = self.config.get('preprocessing', {}).get('use_tomek', False)
 
         if use_tomek:
-            return SMOTETomek(random_state=42, smote=SMOTE(k_neighbors=k))
-        return SMOTE(random_state=42, k_neighbors=k)
+            resampler = SMOTETomek(random_state=42, smote=SMOTE(k_neighbors=k))
+        else:
+            resampler = SMOTE(random_state=42, k_neighbors=k)
+
+        return resampler

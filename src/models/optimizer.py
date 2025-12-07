@@ -84,5 +84,6 @@ class ModelOptimizer:
         if self.logger:
             self.logger.info(f" Time: {optimization_time:.2f}s | Best {scoring.upper()}: {best_score:.4f}")
             self.logger.info(f" Best Params: {best_params}")
+            self.logger.info(f"{model_name} | Best Params: {best_params}")
 
         return best_model, best_params

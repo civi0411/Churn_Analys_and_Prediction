@@ -27,7 +27,7 @@ class EvaluateVisualizer:
         fig.savefig(path, bbox_inches='tight', dpi=300)
         plt.close(fig)
         if self.logger:
-            self.logger.info(f"Saved eval plot: {path}")
+            self.logger.info(f"Saved Plot      | EVALUATION | {filename}")
 
     def plot_confusion_matrix(self, y_true, y_pred, model_name: str):
         """Confusion Matrix đẹp với số lượng và %"""
@@ -77,7 +77,7 @@ class EvaluateVisualizer:
         ax.set_title('ROC Curve Comparison')
         ax.legend(loc="lower right")
 
-        self._save_plot(fig, "roc_curve_comparison.png")
+        self._save_plot(fig, "roc_curve.png")
 
     def plot_feature_importance(self, importance_df: pd.DataFrame, top_n=20):
         """Feature Importance - Horizontal Bar Chart"""
@@ -97,7 +97,7 @@ class EvaluateVisualizer:
             ax.text(width, bar.get_y() + bar.get_height() / 2,
                     f'{width:.3f}', ha='left', va='center', fontsize=8)
 
-        self._save_plot(fig, "feature_importance.png")
+        self._save_plot(fig, f"feature_importance_top_{top_n}.png")
 
     def plot_model_comparison(self, metrics_dict: Dict[str, Dict], metrics_to_plot=['accuracy', 'f1', 'recall']):
         """

@@ -39,181 +39,211 @@ Dự án này không chỉ là một bài toán phân loại Machine Learning th
 ### 📊 Pipeline Flow - Luồng xử lý End-to-End
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd','primaryTextColor':'#1565c0','primaryBorderColor':'#1976d2','lineColor':'#42a5f5','secondaryColor':'#fff3e0','tertiaryColor':'#e8f5e9'}}}%%
 flowchart TB
-    subgraph INPUT["📥 DATA INPUT"]
-        A[("RAW DATA<br/>E Commerce Dataset.xlsx<br/>Sheet: E Comm")]
+    START(["🎬 START"])
+    FINISH(["✨ FINISH"])
+    
+    INPUT[("📥 RAW DATA<br/><b>E Commerce Dataset</b><br/>Excel Sheet: E Comm")]
+    
+    subgraph S1 ["<b>📊 STAGE 1: EDA</b>"]
+        direction TB
+        B1["📂 Load Raw Data"]
+        B2["🔍 Analyze Missing Values"]
+        B3["📈 Correlation Matrix"]
+        B4["📊 Distribution Plots"]
+        B5["⚠️ Outlier Detection"]
+        B1 ==> B2 ==> B3 ==> B4 ==> B5
     end
 
-    subgraph STAGE1["📊 STAGE 1: EDA (Exploratory Data Analysis)"]
-        B1["Load Raw Data"]
-        B2["Analyze Missing Values"]
-        B3["Correlation Matrix"]
-        B4["Distribution Plots"]
-        B5["Outlier Detection"]
-        B1 --> B2 --> B3 --> B4 --> B5
+    subgraph S2 ["<b>🧹 STAGE 2: PREPROCESSING</b>"]
+        direction TB
+        C1["🔧 <b>Clean Data</b><br/>✓ Remove duplicates<br/>✓ Standardize columns<br/>✓ Fix errors"]
+        C2["✅ Validate Quality"]
+        C3["✂️ <b>Stratified Split</b><br/>80% Train | 20% Test"]
+        C1 ==> C2 ==> C3
     end
 
-    subgraph STAGE2["🧹 STAGE 2: PREPROCESSING (DataPreprocessor)"]
-        C1["Clean Data<br/>• Remove duplicates<br/>• Standardize columns<br/>• Fix domain-specific errors"]
-        C2["Validate Data Quality"]
-        C3["Stratified Split<br/>80% Train / 20% Test"]
-        C1 --> C2 --> C3
-    end
-
-    subgraph STAGE3["⚙️ STAGE 3: TRANSFORMATION (DataTransformer)"]
-        D1["TRAIN SET"]
-        D2["FIT + TRANSFORM<br/>• Impute missing (median/mode)<br/>• Handle outliers (IQR clipping)<br/>• Feature engineering<br/>• Label encoding<br/>• Standard scaling"]
-        D3["LEARNED PARAMS<br/>Imputers, Bounds,<br/>Encoders, Scaler"]
-        D4["TEST SET"]
-        D5["TRANSFORM ONLY<br/>(Apply learned params)"]
-        D6["Processed Train"]
-        D7["Processed Test"]
+    subgraph S3 ["<b>⚙️ STAGE 3: TRANSFORMATION</b>"]
+        direction LR
+        D1["🎯 <b>TRAIN SET</b>"]
+        D2["🔨 <b>FIT + TRANSFORM</b><br/>• Impute missing<br/>• Clip outliers<br/>• Feature engineering<br/>• Encoding & Scaling"]
+        D3{{"📦 <b>LEARNED PARAMS</b><br/>Imputers | Bounds<br/>Encoders | Scaler"}}
+        D4["🧪 <b>TEST SET</b>"]
+        D5["🎨 <b>TRANSFORM ONLY</b><br/>Apply learned params"]
         
-        D1 --> D2
-        D2 --> D3
-        D3 --> D6
-        D4 --> D5
-        D3 -.->|"Apply"| D5
-        D5 --> D7
+        D1 ==> D2
+        D2 ==> D3
+        D3 -.->|"store"| D2
+        D4 ==> D5
+        D3 ==>|"apply"| D5
     end
 
-    subgraph STAGE4["🎓 STAGE 4: TRAINING (ModelTrainer)"]
-        E1["Apply SMOTE + Tomek<br/>(Balance classes)"]
-        E2["Train Multiple Models<br/>• Logistic Regression<br/>• SVM<br/>• Decision Tree<br/>• Random Forest<br/>• XGBoost<br/>• AdaBoost"]
-        E3["Hyperparameter Tuning<br/>(RandomizedSearchCV)"]
-        E4["Select Best Model<br/>(Based on F1-Score)"]
-        E1 --> E2 --> E3 --> E4
+    subgraph S4 ["<b>🎓 STAGE 4: TRAINING</b>"]
+        direction TB
+        E1["⚖️ <b>Balance Classes</b><br/>SMOTE + Tomek"]
+        E2["🤖 <b>Train 6 Models</b><br/>LR | SVM | DT<br/>RF | XGB | Ada"]
+        E3["🔍 <b>Hyperparameter Tuning</b><br/>RandomizedSearchCV"]
+        E4["🏆 <b>Select Best Model</b><br/>Based on F1-Score"]
+        E1 ==> E2 ==> E3 ==> E4
     end
 
-    subgraph STAGE5["📈 STAGE 5: EVALUATION (Evaluator)"]
-        F1["Confusion Matrix"]
-        F2["ROC-AUC Curves"]
-        F3["Feature Importance"]
-        F4["Model Comparison"]
-        F5["SHAP Explainability"]
-        F1 --> F2 --> F3 --> F4 --> F5
+    subgraph S5 ["<b>📈 STAGE 5: EVALUATION</b>"]
+        direction TB
+        F1["📊 Confusion Matrix"]
+        F2["📉 ROC-AUC Curves"]
+        F3["🎯 Feature Importance"]
+        F4["📋 Model Comparison"]
+        F5["🔬 SHAP Explainability"]
+        F1 ==> F2 ==> F3 ==> F4 ==> F5
     end
 
-    subgraph STAGE6["📦 STAGE 6: MLOPS"]
-        G1["ExperimentTracker<br/>Log params & metrics"]
-        G2["ModelRegistry<br/>Save best model + metadata"]
-        G3["DataVersioning<br/>Track data hash"]
-        G4["ModelMonitor<br/>Health check & drift detection"]
-        G1 --> G2 --> G3 --> G4
+    subgraph S6 ["<b>📦 STAGE 6: MLOPS</b>"]
+        direction TB
+        G1["📝 Experiment Tracker"]
+        G2["🗃️ Model Registry"]
+        G3["🔖 Data Versioning"]
+        G4["👁️ Model Monitor"]
+        G1 ==> G2 ==> G3 ==> G4
     end
 
-    subgraph OUTPUT["💾 OUTPUTS"]
-        H1["artifacts/experiments/<run_id>/"]
-        H2["artifacts/model_registry/"]
-        H3["artifacts/monitoring/"]
-        H4["artifacts/versions/"]
-    end
+    OUTPUT[("💾 <b>ARTIFACTS</b><br/>experiments/<br/>registry/<br/>monitoring/")]
 
-    A --> STAGE1
-    STAGE1 --> STAGE2
-    STAGE2 --> STAGE3
-    STAGE3 --> STAGE4
-    STAGE4 --> STAGE5
-    STAGE5 --> STAGE6
-    STAGE6 --> OUTPUT
+    START ==> INPUT
+    INPUT ==> S1
+    S1 ==> S2
+    S2 ==> S3
+    S3 ==> S4
+    S4 ==> S5
+    S5 ==> S6
+    S6 ==> OUTPUT
+    OUTPUT ==> FINISH
 
-    style INPUT fill:#e1f5fe
-    style STAGE1 fill:#fff3e0
-    style STAGE2 fill:#e8f5e9
-    style STAGE3 fill:#f3e5f5
-    style STAGE4 fill:#e0f2f1
-    style STAGE5 fill:#fff8e1
-    style STAGE6 fill:#e8eaf6
-    style OUTPUT fill:#fbe9e7
+    classDef startEnd fill:#4caf50,stroke:#2e7d32,stroke-width:3px,color:#fff,font-weight:bold
+    classDef dataNode fill:#2196f3,stroke:#1565c0,stroke-width:3px,color:#fff,font-weight:bold
+    classDef stage1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    classDef stage2 fill:#e8f5e9,stroke:#43a047,stroke-width:2px,color:#2e7d32
+    classDef stage3 fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#6a1b9a
+    classDef stage4 fill:#e0f2f1,stroke:#00897b,stroke-width:2px,color:#00695c
+    classDef stage5 fill:#fff8e1,stroke:#fbc02d,stroke-width:2px,color:#f57f17
+    classDef stage6 fill:#e8eaf6,stroke:#5e35b1,stroke-width:2px,color:#4527a0
+    
+    class START,FINISH startEnd
+    class INPUT,OUTPUT dataNode
+    class S1 stage1
+    class S2 stage2
+    class S3 stage3
+    class S4 stage4
+    class S5 stage5
+    class S6 stage6
 ```
 
 ### 🔐 Nguyên tắc chống Data Leakage
 
-> ⚠️ **Quan trọng**: Mọi thông tin thống kê (mean, std, IQR bounds, encoding mappings...) chỉ được học từ **Train Set**. Test Set chỉ được **Transform** với tham số đã học.
+> ⚠️ **QUAN TRỌNG**: Mọi thông tin thống kê (mean, std, IQR bounds, encoding mappings...) chỉ được học từ **Train Set**. Test Set chỉ được **Transform** với tham số đã học - **KHÔNG BAO GIỜ FIT LẠI!**
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#c8e6c9','secondaryColor':'#ffeb3b','tertiaryColor':'#ffcdd2'}}}%%
 flowchart LR
-    subgraph TRAIN["🎯 TRAIN SET (80%)"]
-        A["FIT<br/>Learn parameters from data"]
-        B["TRANSFORM<br/>Apply to self"]
-        A --> B
+    subgraph TRAIN ["<b>🎯 TRAIN SET</b><br/>(80% data)"]
+        direction TB
+        A["<b>1️⃣ FIT</b><br/>📚 Learn Parameters<br/>from Training Data"]
+        B["<b>2️⃣ TRANSFORM</b><br/>🎨 Apply Parameters<br/>to Training Data"]
+        A ===>|"fit"| B
     end
 
-    subgraph PARAMS["📊 LEARNED PARAMETERS"]
-        C["• Imputer values (median/mode)<br/>• Outlier bounds (Q1-1.5*IQR, Q3+1.5*IQR)<br/>• Label encoders mapping<br/>• Scaler params (mean, std)<br/>• Feature selection mask"]
+    PARAMS{{"<b>📦 LEARNED PARAMS</b><br/><br/>📊 Imputer values<br/>(median/mode)<br/><br/>📏 Outlier bounds<br/>(Q1-1.5×IQR, Q3+1.5×IQR)<br/><br/>🔤 Label encoders<br/>(category → number)<br/><br/>⚖️ Scaler params<br/>(mean, std)<br/><br/>✅ Feature mask<br/>(selected features)"}}
+    
+    subgraph TEST ["<b>🧪 TEST SET</b><br/>(20% data)"]
+        direction TB
+        D["<b>3️⃣ TRANSFORM ONLY</b><br/>🎨 Apply Parameters<br/>⛔ NO FITTING!"]
     end
     
-    subgraph TEST["🧪 TEST SET (20%)"]
-        D["TRANSFORM ONLY<br/>(No fitting!)"]
-    end
+    B ==>|"<b>store</b>"| PARAMS
+    PARAMS ==>|"<b>apply frozen</b>"| D
     
-    B -->|"Store"| C
-    C -->|"Apply frozen params"| D
+    WARNING["⚠️ <b>NO DATA LEAKAGE!</b><br/>Test never influences<br/>training parameters"]
+    D -.->|"guarantee"| WARNING
 
-    style TRAIN fill:#c8e6c9
-    style PARAMS fill:#fff9c4
-    style TEST fill:#ffcdd2
+    classDef trainStyle fill:#c8e6c9,stroke:#388e3c,stroke-width:3px,color:#1b5e20,font-weight:bold
+    classDef paramStyle fill:#fff9c4,stroke:#f9a825,stroke-width:3px,color:#f57f17,font-weight:bold
+    classDef testStyle fill:#ffcdd2,stroke:#e53935,stroke-width:3px,color:#c62828,font-weight:bold
+    classDef warnStyle fill:#ff5252,stroke:#d32f2f,stroke-width:3px,color:#fff,font-weight:bold
+    
+    class TRAIN trainStyle
+    class PARAMS paramStyle
+    class TEST testStyle
+    class WARNING warnStyle
 ```
 
 ### 🧩 Kiến trúc module (Module Architecture)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'14px'}}}%%
 graph TB
-    subgraph ENTRY["🚪 ENTRY POINT"]
-        MAIN["main.py<br/>CLI Interface"]
+    subgraph ENTRY ["<b>🚪 ENTRY POINT</b>"]
+        MAIN["<b>📄 main.py</b><br/>═════════<br/>🎮 CLI Interface<br/>📋 Argument Parser<br/>🚀 Launch Pipeline"]
     end
     
-    subgraph PIPELINE["🔄 PIPELINE ORCHESTRATOR"]
-        PIPE["pipeline.py<br/>• run_eda()<br/>• run_preprocessing()<br/>• run_training()<br/>• run_visualization()"]
-    end
-
-    subgraph DATA["📊 DATA MODULE"]
-        PREP["preprocessor.py<br/>• load_data()<br/>• clean_data()<br/>• split_data()"]
-        TRANS["transformer.py<br/>• fit_transform()<br/>• transform()<br/>• get_resampler()"]
-    end
-    
-    subgraph MODELS["🤖 MODELS MODULE"]
-        TRAIN["trainer.py<br/>• train_model()<br/>• train_all_models()<br/>• evaluate()"]
-        OPT["optimizer.py<br/>• optimize_params()<br/>• grid_search()"]
-        EVAL["evaluator.py<br/>• calculate_metrics()<br/>• confusion_matrix()"]
-    end
-    
-    subgraph VIZ["📈 VISUALIZATION MODULE"]
-        EDA["eda_plots.py<br/>• plot_missing_values()<br/>• plot_correlation_matrix()"]
-        EVIZ["evaluate_plots.py<br/>• plot_confusion_matrix()<br/>• plot_roc_curve()<br/>• plot_feature_importance()"]
-    end
-    
-    subgraph OPS["⚡ OPS MODULE"]
-        DOPS["dataops.py<br/>• DataValidator<br/>• DataVersioning"]
-        MOPS["mlops.py<br/>• ExperimentTracker<br/>• ModelRegistry<br/>• ModelMonitor<br/>• ModelExplainer"]
-    end
-    
-    subgraph UTILS["🛠️ UTILITIES"]
-        UTIL["utils.py<br/>• ConfigLoader<br/>• Logger<br/>• IOHandler"]
+    subgraph PIPELINE ["<b>🔄 PIPELINE ORCHESTRATOR</b>"]
+        PIPE["<b>📄 pipeline.py</b><br/>═════════<br/>🎬 run_eda()<br/>🧹 run_preprocessing()<br/>🎓 run_training()<br/>📊 run_visualization()<br/>⚙️ Coordinate all stages"]
     end
 
-    MAIN --> PIPE
-    PIPE --> DATA
-    PIPE --> MODELS
-    PIPE --> VIZ
-    PIPE --> OPS
+    subgraph DATA ["<b>📊 DATA MODULE</b><br/>(src/data/)"]
+        PREP["<b>preprocessor.py</b><br/>═════════<br/>📂 load_data()<br/>🧹 clean_data()<br/>✂️ split_data()"]
+        TRANS["<b>transformer.py</b><br/>═════════<br/>🔨 fit_transform()<br/>🎨 transform()<br/>⚖️ get_resampler()"]
+    end
     
-    DATA --> UTIL
-    MODELS --> UTIL
-    VIZ --> UTIL
-    OPS --> UTIL
+    subgraph MODELS ["<b>🤖 MODELS MODULE</b><br/>(src/models/)"]
+        TRAIN["<b>trainer.py</b><br/>═════════<br/>🎓 train_model()<br/>🔄 train_all_models()<br/>📊 evaluate()"]
+        OPT["<b>optimizer.py</b><br/>═════════<br/>🔍 optimize_params()<br/>🎯 grid_search()<br/>📈 RandomizedSearch"]
+        EVAL["<b>evaluator.py</b><br/>═════════<br/>📊 calculate_metrics()<br/>📋 confusion_matrix()<br/>📈 roc_auc_score()"]
+    end
     
-    PREP -.-> TRANS
-    TRAIN -.-> OPT
-    TRAIN -.-> EVAL
+    subgraph VIZ ["<b>📈 VISUALIZATION MODULE</b><br/>(src/visualization/)"]
+        EDA["<b>eda_plots.py</b><br/>═════════<br/>📊 missing_values()<br/>📉 correlation_matrix()<br/>📈 distributions()"]
+        EVIZ["<b>evaluate_plots.py</b><br/>═════════<br/>📊 confusion_matrix()<br/>📉 roc_curve()<br/>📈 feature_importance()"]
+    end
+    
+    subgraph OPS ["<b>⚡ OPS MODULE</b><br/>(src/ops/)"]
+        DOPS["<b>dataops.py</b><br/>═════════<br/>✅ DataValidator<br/>🔖 DataVersioning<br/>🔍 Quality Checks"]
+        MOPS["<b>mlops.py</b><br/>═════════<br/>📝 ExperimentTracker<br/>🗃️ ModelRegistry<br/>👁️ ModelMonitor<br/>🔬 ModelExplainer"]
+    end
+    
+    subgraph UTILS ["<b>🛠️ UTILITIES</b><br/>(src/)"]
+        UTIL["<b>utils.py</b><br/>═════════<br/>⚙️ ConfigLoader<br/>📝 Logger<br/>💾 IOHandler<br/>🎲 set_random_seed()"]
+    end
 
-    style ENTRY fill:#e3f2fd
-    style PIPELINE fill:#f3e5f5
-    style DATA fill:#e8f5e9
-    style MODELS fill:#fff3e0
-    style VIZ fill:#fce4ec
-    style OPS fill:#fff8e1
-    style UTILS fill:#eceff1
+    MAIN ==>|"execute"| PIPE
+    PIPE ==>|"orchestrate"| DATA
+    PIPE ==>|"orchestrate"| MODELS
+    PIPE ==>|"orchestrate"| VIZ
+    PIPE ==>|"orchestrate"| OPS
+    
+    DATA -->|"use"| UTIL
+    MODELS -->|"use"| UTIL
+    VIZ -->|"use"| UTIL
+    OPS -->|"use"| UTIL
+    
+    PREP -.->|"feeds into"| TRANS
+    TRAIN -.->|"uses"| OPT
+    TRAIN -.->|"uses"| EVAL
+
+    classDef entryStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#0d47a1
+    classDef pipeStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#4a148c
+    classDef dataStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:3px,color:#1b5e20
+    classDef modelStyle fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#e65100
+    classDef vizStyle fill:#fce4ec,stroke:#c2185b,stroke-width:3px,color:#880e4f
+    classDef opsStyle fill:#fff8e1,stroke:#fbc02d,stroke-width:3px,color:#f57f17
+    classDef utilStyle fill:#eceff1,stroke:#546e7a,stroke-width:3px,color:#263238
+    
+    class ENTRY entryStyle
+    class PIPELINE pipeStyle
+    class DATA dataStyle
+    class MODELS modelStyle
+    class VIZ vizStyle
+    class OPS opsStyle
+    class UTILS utilStyle
 ```
 
 ---
@@ -316,10 +346,29 @@ graph TB
 │
 └── 📂 tests/                            # 🧪 TESTING SUITE
     ├── 📄 conftest.py                   # Pytest fixtures và configuration
-    ├── 📄 test_data_processing.py       # Tests cho data module
-    ├── 📄 test_feature_engineering.py   # Tests cho transformer
-    ├── 📄 test_model_training.py        # Tests cho models module
-    ├── 📄 test_utils.py                 # Tests cho utilities
+    ├── 📄 test_utils.py                 # Tests cho src/utils.py
+    ├── 📄 test_pipeline.py              # Tests cho src/pipeline.py
+    │
+    ├── 📂 test_data/                    # Tests cho src/data/
+    │   ├── 📄 __init__.py
+    │   ├── 📄 test_preprocessor.py      # Tests cho DataPreprocessor
+    │   └── 📄 test_transformer.py       # Tests cho DataTransformer
+    │
+    ├── 📂 test_models/                  # Tests cho src/models/
+    │   ├── 📄 __init__.py
+    │   ├── 📄 test_trainer.py           # Tests cho ModelTrainer
+    │   ├── 📄 test_optimizer.py         # Tests cho ModelOptimizer
+    │   └── 📄 test_evaluator.py         # Tests cho ModelEvaluator
+    │
+    ├── 📂 test_ops/                     # Tests cho src/ops/
+    │   ├── 📄 __init__.py
+    │   ├── 📄 test_dataops.py           # Tests cho DataValidator, DataVersioning
+    │   └── 📄 test_mlops.py             # Tests cho ExperimentTracker, ModelRegistry, etc.
+    │
+    ├── 📂 test_visualization/           # Tests cho src/visualization/
+    │   ├── 📄 __init__.py
+    │   ├── 📄 test_eda_plots.py         # Tests cho EDAVisualizer
+    │   └── 📄 test_evaluate_plots.py    # Tests cho EvaluateVisualizer
     │
     └── 📂 data/                         # Test data samples
         ├── 📄 sample_raw.csv            # Raw data mẫu cho testing
@@ -339,7 +388,7 @@ graph TB
 | `artifacts/experiments/` | Lưu trữ từng run | Review lại experiments cũ |
 | `artifacts/model_registry/` | Models production-ready | Deploy model vào production |
 | `artifacts/monitoring/` | Performance logs | Theo dõi model degradation |
-| `tests/` | Unit & integration tests | CI/CD, đảm bảo code quality |
+| `tests/` | Unit & integration tests (77 tests) | CI/CD, đảm bảo code quality |
 
 ---
 
@@ -491,15 +540,48 @@ pip install -r requirements.txt
 pip list
 ```
 
-**Dependencies chính:**
-- `pandas>=2.0.3`, `numpy>=1.24.3` - Xử lý dữ liệu
-- `scikit-learn>=1.3.0` - Machine Learning
-- `xgboost>=2.0.0` - Gradient Boosting
-- `imbalanced-learn>=0.11.0` - SMOTE
-- `matplotlib>=3.7.2`, `seaborn>=0.12.2` - Visualization
-- `shap>=0.42.1` - Model explainability
-- `PyYAML>=6.0.1` - Config parsing
-- `pytest>=9.0.0`, `pytest-cov>=7.0.0` - Testing
+#### 📋 Dependencies chi tiết (requirements.txt)
+
+**1. Core Data Science (Xử lý dữ liệu nền tảng)**
+```
+numpy>=1.24.3           # Tính toán ma trận, số học
+pandas>=2.0.3           # Xử lý DataFrame (Bản 2.0+ tối ưu bộ nhớ)
+openpyxl>=3.1.2         # BẮT BUỘC: Engine để đọc file Excel (.xlsx)
+```
+
+**2. Machine Learning Models**
+```
+scikit-learn>=1.3.0     # Thư viện ML chính (Pipeline, Metrics, RF...)
+xgboost>=2.0.0          # Model Gradient Boosting (Mạnh mẽ hơn RF)
+imbalanced-learn>=0.11.0 # Hỗ trợ SMOTE (Xử lý dữ liệu mất cân bằng)
+```
+
+**3. Visualization (Trực quan hóa)**
+```
+matplotlib>=3.7.2       # Vẽ biểu đồ cơ bản
+seaborn>=0.12.2         # Vẽ biểu đồ thống kê đẹp (Heatmap, Distribution)
+```
+
+**4. Explainability (Giải thích mô hình)**
+```
+shap>=0.42.1            # Giải thích lý do tại sao khách hàng Churn (Feature Importance)
+```
+
+**5. Utilities & System (Cấu hình & Hệ thống)**
+```
+PyYAML>=6.0.1           # Đọc file cấu hình config.yaml
+joblib>=1.3.2           # Lưu/Tải model (.pkl) tốc độ cao
+tqdm>=4.66.1            # Thanh tiến trình (Loading bar) cho training
+typing-extensions>=4.7.1 # Hỗ trợ Type Hinting
+```
+
+**6. Testing**
+```
+pytest>=9.0.0           # Testing framework
+pytest-cov>=7.0.0       # Coverage reporting
+```
+
+> 💡 **Lưu ý**: Tổng dung lượng download ~500MB. Thời gian cài đặt ~5-10 phút tùy tốc độ mạng.
 
 ### ⚙️ Bước 4: Cấu hình (Optional)
 
@@ -693,295 +775,65 @@ python main.py --mode visualize --model random_forest
 
 ## 🧪 Testing (Kiểm thử)
 
-Dự án sử dụng `pytest` cho unit tests và integration tests.
+### 📊 Test Coverage
 
-### 📋 Cấu trúc Tests
+Hệ thống có **77 unit tests** được tổ chức theo cấu trúc module tương ứng với `src/`:
 
-```
-tests/
-├── conftest.py                      # Pytest fixtures và configuration
-├── test_data_processing.py          # Test DataPreprocessor
-├── test_feature_engineering.py      # Test DataTransformer
-├── test_model_training.py           # Test ModelTrainer
-├── test_utils.py                    # Test utilities (Logger, IOHandler, ConfigLoader)
-└── data/
-    ├── sample_raw.csv               # Sample raw data cho tests
-    └── sample_processed.csv         # Sample processed data
-```
+| Module Test | Số Tests | Mô tả |
+|-------------|----------|-------|
+| `test_data/test_preprocessor.py` | 8 | Tests cho DataPreprocessor (clean, split) |
+| `test_data/test_transformer.py` | 12 | Tests cho DataTransformer (impute, encode, scale) |
+| `test_models/test_trainer.py` | 13 | Tests cho ModelTrainer (train, evaluate, save) |
+| `test_models/test_optimizer.py` | 6 | Tests cho ModelOptimizer (GridSearch, RandomizedSearch) |
+| `test_models/test_evaluator.py` | 9 | Tests cho ModelEvaluator (metrics, confusion matrix) |
+| `test_ops/test_dataops.py` | 12 | Tests cho DataValidator, DataVersioning |
+| `test_ops/test_mlops.py` | 19 | Tests cho ExperimentTracker, ModelRegistry, ModelMonitor |
+| `test_visualization/test_eda_plots.py` | 8 | Tests cho EDAVisualizer |
+| `test_visualization/test_evaluate_plots.py` | 9 | Tests cho EvaluateVisualizer |
+| `test_utils.py` | 14 | Tests cho utility functions |
+| `test_pipeline.py` | 5 | Tests cho Pipeline orchestrator |
 
-### 🏃 Chạy Tests
-
-#### 1️⃣ Chạy tất cả tests
+### 🏃 Các cách chạy Tests
 
 ```powershell
+# Chạy tất cả tests
 pytest
-```
 
-**Output mẫu:**
-```
-============================= test session starts =============================
-collected 45 items
-
-tests/test_data_processing.py .........                                  [ 20%]
-tests/test_feature_engineering.py ..........                             [ 42%]
-tests/test_model_training.py ...........                                 [ 67%]
-tests/test_utils.py ..............                                       [100%]
-
-============================= 45 passed in 12.34s =============================
-```
-
-#### 2️⃣ Chạy tests với verbose output
-
-```powershell
+# Chạy với verbose output
 pytest -v
-```
 
-**Hiển thị chi tiết từng test case:**
-```
-tests/test_data_processing.py::test_load_data PASSED                    [ 2%]
-tests/test_data_processing.py::test_clean_data PASSED                   [ 4%]
-tests/test_data_processing.py::test_split_data PASSED                   [ 6%]
-...
-```
+# Chạy theo module cụ thể
+pytest tests/test_data/                     # Tất cả tests cho data module
+pytest tests/test_models/                   # Tất cả tests cho models module
+pytest tests/test_ops/                      # Tất cả tests cho ops module
+pytest tests/test_visualization/            # Tất cả tests cho visualization module
 
-#### 3️⃣ Chạy tests của một module cụ thể
+# Chạy file test cụ thể
+pytest tests/test_data/test_preprocessor.py
+pytest tests/test_models/test_trainer.py
 
-```powershell
-# Test data processing
-pytest tests/test_data_processing.py
+# Chạy test case cụ thể
+pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data_removes_duplicates
 
-# Test feature engineering
-pytest tests/test_feature_engineering.py
-
-# Test model training
-pytest tests/test_model_training.py
-
-# Test utilities
-pytest tests/test_utils.py
-```
-
-#### 4️⃣ Chạy test cụ thể (một hàm)
-
-```powershell
-# Chạy một test function cụ thể
-pytest tests/test_data_processing.py::test_clean_data
-
-# Chạy tests matching pattern
-pytest -k "test_load"
-pytest -k "transformer"
-```
-
-#### 5️⃣ Chạy tests với coverage report
-
-```powershell
-# Coverage cơ bản
-pytest --cov=src
-
-# Coverage với báo cáo chi tiết
+# Chạy với coverage
 pytest --cov=src --cov-report=term-missing
 
-# Coverage với báo cáo HTML
+# Coverage HTML report
 pytest --cov=src --cov-report=html
-
 # Sau đó mở: htmlcov/index.html
-```
 
-**Output coverage mẫu:**
-```
----------- coverage: platform win32, python 3.11.5 ----------
-Name                              Stmts   Miss  Cover   Missing
----------------------------------------------------------------
-src/__init__.py                       0      0   100%
-src/pipeline.py                     145     12    92%   234-245
-src/utils.py                         89      5    94%   112-116
-src/data/__init__.py                  0      0   100%
-src/data/preprocessor.py             82      3    96%   78-80
-src/data/transformer.py             269     18    93%   145-163
-src/models/__init__.py                0      0   100%
-src/models/trainer.py               156     10    94%   223-232
-src/models/evaluator.py              54      2    96%   48-49
-src/models/optimizer.py              67      4    94%   59-62
-src/ops/__init__.py                   0      0   100%
-src/ops/dataops.py                   98      6    94%   85-90
-src/ops/mlops.py                    485     35    93%   Multiple lines
-src/visualization/__init__.py         0      0   100%
-src/visualization/eda_plots.py      112      8    93%   89-96
-src/visualization/evaluate_plots.py 128     11    91%   105-115
----------------------------------------------------------------
-TOTAL                              1685    114    93%
-```
+# Chạy tests matching pattern
+pytest -k "transformer"
 
-#### 6️⃣ Chạy tests nhanh (skip slow tests)
-
-```powershell
-# Skip tests được mark là slow
-pytest -m "not slow"
-
-# Chỉ chạy fast tests
-pytest -m fast
-```
-
-#### 7️⃣ Chạy tests với output chi tiết
-
-```powershell
-# Hiển thị print statements
-pytest -s
-
-# Hiển thị local variables khi fail
-pytest -l
-
-# Stop sau test fail đầu tiên
+# Stop khi fail đầu tiên
 pytest -x
 
-# Stop sau N failures
-pytest --maxfail=3
-```
-
-#### 8️⃣ Chạy tests song song (nhanh hơn)
-
-```powershell
-# Cài pytest-xdist
+# Chạy song song (nhanh hơn)
 pip install pytest-xdist
-
-# Chạy với N workers
-pytest -n 4
-
-# Chạy với auto workers (dựa trên CPU cores)
 pytest -n auto
 ```
 
-#### 9️⃣ Tạo test report
-
-```powershell
-# XML report (cho CI/CD)
-pytest --junitxml=test-results.xml
-
-# HTML report
-pip install pytest-html
-pytest --html=test-report.html --self-contained-html
-```
-
-#### 🔟 Watch mode (auto-rerun khi code thay đổi)
-
-```powershell
-# Cài pytest-watch
-pip install pytest-watch
-
-# Auto-rerun tests
-ptw
-```
-
----
-
-### 📊 Test Coverage Goals
-
-| Module | Target Coverage | Current | Status |
-|--------|----------------|---------|--------|
-| `src/data/` | ≥ 90% | 94% | ✅ |
-| `src/models/` | ≥ 90% | 94% | ✅ |
-| `src/ops/` | ≥ 85% | 93% | ✅ |
-| `src/visualization/` | ≥ 80% | 92% | ✅ |
-| `src/utils.py` | ≥ 95% | 94% | ⚠️ |
-| **Overall** | **≥ 90%** | **93%** | **✅** |
-
----
-
-### 🔍 Test Examples
-
-#### Example 1: Test Data Processing
-```python
-# tests/test_data_processing.py
-def test_load_data(sample_raw_data):
-    """Test loading raw data"""
-    assert sample_raw_data.shape[0] == 5
-    assert 'target' in sample_raw_data.columns
-
-def test_clean_data(sample_raw_data):
-    """Test data cleaning"""
-    # Remove duplicates
-    cleaned = preprocessor.clean_data(sample_raw_data)
-    assert cleaned.shape[0] <= sample_raw_data.shape[0]
-```
-
-#### Example 2: Test Feature Engineering
-```python
-# tests/test_feature_engineering.py
-def test_fit_transform():
-    """Test transformer fit and transform"""
-    X_train, y_train = transformer.fit_transform(train_df)
-    assert X_train.shape[0] == train_df.shape[0]
-    assert y_train is not None
-
-def test_transform_test():
-    """Test transformer only transforms test"""
-    X_test, y_test = transformer.transform(test_df)
-    # Should use fitted params, not refit
-    assert X_test.shape[1] == X_train.shape[1]
-```
-
-#### Example 3: Test Model Training
-```python
-# tests/test_model_training.py
-def test_train_xgboost():
-    """Test XGBoost training"""
-    trainer.load_train_test_data(train_path, test_path)
-    trainer.train_model('xgboost')
-    assert trainer.models['xgboost'] is not None
-
-def test_evaluate_model():
-    """Test model evaluation"""
-    metrics = trainer.evaluate('xgboost')
-    assert 'f1' in metrics['metrics']
-    assert metrics['metrics']['f1'] > 0
-```
-
----
-
-### 🐛 Debugging Tests
-
-```powershell
-# Chạy với debugger
-pytest --pdb
-
-# Drop vào debugger khi fail
-pytest --pdb --pdbcls=IPython.terminal.debugger:Pdb
-
-# Chạy last failed tests only
-pytest --lf
-
-# Chạy failed tests trước, sau đó mới chạy passed
-pytest --ff
-```
-
----
-
-### ✅ Best Practices
-
-1. **Chạy tests trước khi commit**
-   ```powershell
-   pytest --cov=src --cov-report=term-missing
-   ```
-
-2. **Kiểm tra coverage đầy đủ**
-   ```powershell
-   pytest --cov=src --cov-report=html
-   # Review htmlcov/index.html
-   ```
-
-3. **Test trên nhiều môi trường**
-   ```powershell
-   # Test với Python 3.9, 3.10, 3.11
-   tox  # (nếu có tox.ini)
-   ```
-
-4. **CI/CD Integration**
-   ```yaml
-   # .github/workflows/tests.yml
-   - name: Run tests
-     run: |
-       pytest --cov=src --cov-report=xml
-       pytest --junitxml=test-results.xml
-   ```
+**Coverage hiện tại:** 93% (Target: ≥90%) ✅
 
 ---
 
@@ -1123,7 +975,7 @@ tuning:
 pytest -v -s
 
 # 2. Chạy test cụ thể bị fail
-pytest tests/test_data_processing.py::test_failing_function -v
+pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data_removes_duplicates -v
 
 # 3. Check dependencies
 pip install -r requirements.txt --upgrade

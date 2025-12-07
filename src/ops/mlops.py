@@ -432,7 +432,8 @@ class ModelExplainer:
     Model Explainability - SHAP & Feature Importance
     """
 
-    def __init__(self, model, X_train, feature_names: List[str]):
+    def __init__(self, model, X_train, feature_names: List[str], logger=None):
+        self.logger = logger
         if hasattr(model, 'named_steps') and 'model' in model.named_steps:
             self.model = model.named_steps['model']
         else:
@@ -452,34 +453,81 @@ class ModelExplainer:
 
         return importance_df
 
-    def explain_with_shap(self, X_sample, save_path: str = None):
+    def explain_with_shap(self, X_sample, save_path: str = None) -> bool:
         """
         Generate SHAP explanations
         Requires: pip install shap
+
+        Returns:
+            bool: True nếu thành công, False nếu thất bại
         """
         try:
             import shap
+            import numpy as np
             import matplotlib.pyplot as plt
 
-            # Create explainer
-            explainer = shap.TreeExplainer(self.model)
-            shap_values = explainer.shap_values(X_sample)
+            if self.logger:
+                self.logger.info("Generating SHAP explanations...")
+
+            shap_values = None
+
+            # Method 1: Try TreeExplainer (fastest, but may fail with new XGBoost)
+            try:
+                explainer = shap.TreeExplainer(self.model)
+                shap_values = explainer.shap_values(X_sample)
+                if self.logger:
+                    self.logger.info("  Using TreeExplainer")
+            except Exception as tree_error:
+                if self.logger:
+                    self.logger.warning(f"  TreeExplainer failed: {str(tree_error)[:50]}...")
+
+                # Method 2: Use Explainer with predict function
+                try:
+                    # Wrap predict_proba để trả về xác suất class 1
+                    def model_predict(x):
+                        return self.model.predict_proba(x)[:, 1]
+
+                    # Sử dụng background data nhỏ để tăng tốc
+                    background = shap.sample(X_sample, min(50, len(X_sample)))
+                    explainer = shap.KernelExplainer(model_predict, background)
+                    shap_values = explainer.shap_values(X_sample, nsamples=100)
+                    if self.logger:
+                        self.logger.info("  Using KernelExplainer (slower but compatible)")
+                except Exception as kernel_error:
+                    if self.logger:
+                        self.logger.warning(f"  KernelExplainer also failed: {kernel_error}")
+                    return False
+
+            if shap_values is None:
+                if self.logger:
+                    self.logger.warning("  Could not compute SHAP values")
+                return False
 
             # Plot
             plt.figure(figsize=(10, 6))
             shap.summary_plot(shap_values, X_sample, feature_names=self.feature_names, show=False)
 
             if save_path:
-                plt.savefig(save_path, bbox_inches='tight')
+                plt.savefig(save_path, bbox_inches='tight', dpi=150)
                 plt.close()
+                if self.logger:
+                    self.logger.info(f"SHAP Plot     | {save_path}")
+                return True
             else:
                 plt.show()
-
-            return shap_values
+                return True
 
         except ImportError:
-            print("[WARN] SHAP not installed. Run: pip install shap")
-            return None
+            msg = "SHAP not installed. Run: pip install shap"
+            if self.logger:
+                self.logger.warning(f"[SHAP] {msg}")
+            else:
+                print(f"[WARN] {msg}")
+            return False
         except Exception as e:
-            print(f"[ERROR] SHAP explanation failed: {e}")
-            return None
+            msg = f"SHAP explanation failed: {e}"
+            if self.logger:
+                self.logger.warning(f"[SHAP] {msg}")
+            else:
+                print(f"[ERROR] {msg}")
+            return False

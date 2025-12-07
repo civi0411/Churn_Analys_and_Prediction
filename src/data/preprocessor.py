@@ -18,16 +18,20 @@ class DataPreprocessor:
 
     def load_data(self, raw_path: str) -> pd.DataFrame:
         """Load dữ liệu và inspect cơ bản"""
+        if self.logger:
+            self.logger.info("=" * 60)
+            self.logger.info("STAGE 1: LOAD & CLEAN")
+
         sheet = self.config.get('data', {}).get('sheet_name', 0) if raw_path.endswith('.xlsx') else None
 
         try:
-            # Gọi IOHandler từ utils
             df = IOHandler.read_data(raw_path, sheet_name=sheet)
             if self.logger:
-                self.logger.info(f"Data Loaded | Path: {raw_path} | Shape: {df.shape}")
+                self.logger.info(f"Loaded data: {df.shape[0]} rows, {df.shape[1]} columns")
             return df
         except Exception as e:
-            if self.logger: self.logger.error(f"Load Error: {e}")
+            if self.logger:
+                self.logger.error(f"Load Error: {e}")
             raise e
 
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -40,14 +44,18 @@ class DataPreprocessor:
         # 1. Standardize columns
         df.columns = df.columns.str.strip()
 
-        # 2. Remove duplicates
+        # 2. Calculate stats before cleaning
+        missing_count = df.isnull().sum().sum()
+        duplicates_count = df.duplicated().sum()
+
+        if self.logger:
+            self.logger.info(f"Shape: {df.shape} | Missing: {missing_count} | Duplicates: {duplicates_count}")
+
+        # 3. Remove duplicates
         initial_rows = len(df)
         df = df.drop_duplicates()
-        if self.logger and len(df) < initial_rows:
-            self.logger.info(f"Removed {initial_rows - len(df)} duplicate rows")
 
-        # 3. Domain Specific Cleaning (Hard-coded mappings)
-        # Sửa các lỗi nhập liệu thường gặp
+        # 4. Domain Specific Cleaning (Hard-coded mappings)
         if 'PreferredLoginDevice' in df.columns:
             df['PreferredLoginDevice'] = df['PreferredLoginDevice'].replace({'Phone': 'Mobile Phone'})
 
@@ -57,12 +65,19 @@ class DataPreprocessor:
                 'Cash on Delivery': 'COD'
             })
 
+        if self.logger:
+            self.logger.info("Data cleaning completed")
+
         return df
 
     def split_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Chia Train/Test Stratify theo target.
         """
+        if self.logger:
+            self.logger.info("=" * 60)
+            self.logger.info("STAGE 2: SPLIT")
+
         if self.target_col not in df.columns:
             raise ValueError(f"Target '{self.target_col}' not found for splitting")
 
@@ -76,7 +91,8 @@ class DataPreprocessor:
             stratify=df[self.target_col]
         )
 
+        train_pct = (1 - test_size) * 100
         if self.logger:
-            self.logger.info(f"Data Split | Train: {len(train_df)} | Test: {len(test_df)}")
+            self.logger.info(f"Split: Train={len(train_df)} ({train_pct:.1f}%) | Test={len(test_df)}")
 
         return train_df, test_df
