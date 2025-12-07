@@ -270,8 +270,14 @@ class ModelMonitor:
         }])
 
         try:
-            df = pd.read_csv(self.performance_log)
-            df = pd.concat([df, new_row], ignore_index=True)
+            if os.path.exists(self.performance_log):
+                df = pd.read_csv(self.performance_log)
+                if df.empty:
+                    df = new_row
+                else:
+                    df = pd.concat([df, new_row], ignore_index=True)
+            else:
+                df = new_row
             df.to_csv(self.performance_log, index=False)
         except Exception as e:
             print(f"Error logging performance: {e}")

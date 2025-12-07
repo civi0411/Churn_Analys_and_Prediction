@@ -66,7 +66,8 @@ class EDAVisualizer:
         missing_pct = (missing / len(df)) * 100
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(x=missing_pct.values, y=missing_pct.index, palette="viridis", ax=ax)
+        sns.barplot(x=missing_pct.values, y=missing_pct.index,
+                    hue=missing_pct.index, palette="viridis", ax=ax, legend=False)
 
         ax.set_title("Percentage of Missing Values by Feature", fontsize=14)
         ax.set_xlabel("Missing Percentage (%)")

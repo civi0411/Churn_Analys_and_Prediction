@@ -89,11 +89,14 @@ class Pipeline:
         if self.target_col in df.columns:
             self.eda_viz.plot_target_distribution(df[self.target_col])
 
+        numerical_cols = df.select_dtypes(include=['number']).columns.tolist()
         # Helper to identify types for plotting distributions
-        self.preprocessor._identify_column_types(
-            df)  # (Hàm này có trong code cũ của bạn, cần đảm bảo preprocessor có logic này)
-        if hasattr(self.preprocessor, 'numerical_cols'):
-            self.eda_viz.plot_numerical_distributions(df, self.preprocessor.numerical_cols)
+        if self.target_col in numerical_cols:
+            numerical_cols.remove(self.target_col)
+
+        if numerical_cols:
+            self.eda_viz.plot_numerical_distributions(df, numerical_cols)
+            self.eda_viz.plot_outliers_boxplot(df, numerical_cols)
 
         self.logger.info("EDA Completed.")
 
@@ -283,9 +286,11 @@ class Pipeline:
             # 4. Model Explainability (SHAP)
             if self.config.get('explainability', {}).get('enabled', False):
                 try:
+                    import numpy as np
                     self.logger.info("Running SHAP explanation...")
                     # Lấy feature names từ columns của X_train (đã transform)
-                    feature_names = trainer.X_train.columns.tolist()
+                    X_train_numeric = trainer.X_train.select_dtypes(include=[np.number])
+                    feature_names = X_train_numeric.columns.tolist()
 
                     explainer = ModelExplainer(
                         trainer.best_model,
@@ -294,7 +299,7 @@ class Pipeline:
                     )
 
                     # SHAP explanation on sample
-                    X_sample = trainer.X_test.head(100)
+                    X_sample = trainer.X_test.head(100).select_dtypes(include=[np.number])
                     shap_path = os.path.join(self.eval_viz.eval_dir, 'shap_summary.png')
                     explainer.explain_with_shap(X_sample, shap_path)
                     self.logger.info(f"SHAP Plot Saved | {shap_path}")

@@ -99,9 +99,9 @@ class ModelTrainer:
         elif model_name == 'decision_tree':
             return DecisionTreeClassifier(random_state=rs, **params)
         elif model_name == 'adaboost':
-            return AdaBoostClassifier(random_state=rs, algorithm='SAMME', **params)
+            return AdaBoostClassifier(random_state=rs, **params)
         elif model_name == 'xgboost':
-            return XGBClassifier(random_state=rs, use_label_encoder=False, **params) if XGBOOST_AVAILABLE else None
+            return XGBClassifier(random_state=rs, **params) if XGBOOST_AVAILABLE else None
         else:
             raise ValueError(f"Unknown model: {model_name}")
 
