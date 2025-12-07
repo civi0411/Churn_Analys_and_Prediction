@@ -1,6 +1,34 @@
 """
 src/models/trainer.py
-Nhiệm vụ: Quản lý Model, Training loop, Save/Load
+
+Model Training Module - Quản lý toàn bộ quy trình training models
+
+Module này là entry point chính cho việc training ML models:
+    - Load train/test data
+    - Factory pattern để tạo các loại model khác nhau
+    - Training với hyperparameter optimization
+    - Evaluation và chọn best model
+    - Feature importance extraction
+
+Supported Models:
+    - Logistic Regression
+    - SVM (Support Vector Machine)
+    - Decision Tree
+    - Random Forest
+    - XGBoost
+    - AdaBoost
+
+Architecture:
+    - ModelTrainer sở hữu ModelOptimizer và ModelEvaluator (Composition)
+    - Hỗ trợ imbalanced data với SMOTE/SMOTETomek injection
+
+Example:
+    >>> trainer = ModelTrainer(config, logger)
+    >>> trainer.load_train_test_data()
+    >>> metrics = trainer.train_all_models(optimize=True, sampler=smote)
+    >>> print(f"Best model: {trainer.best_model_name}")
+
+Author: Churn Prediction Team
 """
 import pandas as pd
 import os
@@ -36,9 +64,46 @@ from .evaluator import ModelEvaluator
 
 
 class ModelTrainer:
-    """Class quản lý toàn bộ quy trình training (Main Entry Point for Models)"""
+    """
+    Model Trainer - Quản lý toàn bộ quy trình training.
+
+    Class này đóng vai trò là orchestrator cho việc training:
+        - Load data từ train/test files
+        - Tạo model instances với Factory pattern
+        - Train với hyperparameter optimization
+        - Evaluate và chọn best model
+
+    Attributes:
+        config (Dict): Configuration dictionary
+        logger: Logger instance
+        optimizer (ModelOptimizer): Hyperparameter optimizer
+        evaluator (ModelEvaluator): Model evaluator
+        models (Dict): Dictionary lưu các trained models
+        best_model: Model tốt nhất
+        best_model_name (str): Tên model tốt nhất
+        results (Dict): Kết quả evaluation
+        X_train, X_test, y_train, y_test: Data placeholders
+
+    Example:
+        >>> trainer = ModelTrainer(config, logger)
+        >>> trainer.load_train_test_data()
+        >>> sampler = SMOTETomek()
+        >>> metrics = trainer.train_all_models(optimize=True, sampler=sampler)
+        >>> print(f"Best: {trainer.best_model_name} - F1: {metrics[trainer.best_model_name]['f1']:.4f}")
+    """
 
     def __init__(self, config: Dict[str, Any], logger=None):
+        """
+        Khởi tạo ModelTrainer.
+
+        Args:
+            config (Dict[str, Any]): Configuration dictionary chứa:
+                - data.target_col: Tên cột target
+                - data.train_test_dir: Thư mục chứa train/test files
+                - models: Dictionary các model configs
+                - tuning: Hyperparameter tuning settings
+            logger: Logger instance (optional)
+        """
         self.config = config
         self.logger = logger
 
@@ -64,7 +129,29 @@ class ModelTrainer:
     # ==================== DATA LOADING ====================
 
     def load_train_test_data(self, train_path: str = None, test_path: str = None) -> None:
-        """Load dữ liệu train/test và tách X, y"""
+        """
+        Load dữ liệu train/test từ files và tách X, y.
+
+        Nếu không cung cấp paths, sẽ tự động tìm files mới nhất
+        trong thư mục train_test_dir.
+
+        Args:
+            train_path (str, optional): Đường dẫn file train
+            test_path (str, optional): Đường dẫn file test
+
+        Sets:
+            self.X_train, self.y_train: Training features và target
+            self.X_test, self.y_test: Test features và target
+
+        Raises:
+            FileNotFoundError: Nếu không tìm thấy train/test files
+            KeyError: Nếu target column không tồn tại
+
+        Example:
+            >>> trainer.load_train_test_data()
+            >>> print(trainer.X_train.shape)
+            (4504, 19)
+        """
         if train_path is None or test_path is None:
             train_test_dir = self.config['data']['train_test_dir']
             raw_filename = self.config['data'].get('raw_path')
@@ -87,7 +174,27 @@ class ModelTrainer:
     # ==================== MODEL FACTORY ====================
 
     def _get_model_instance(self, model_name: str, params: Dict = None) -> Any:
-        """Factory tạo model instance"""
+        """
+        Factory method tạo model instance.
+
+        Hỗ trợ các models:
+            - random_forest: RandomForestClassifier
+            - logistic_regression: LogisticRegression
+            - svm: SVC
+            - decision_tree: DecisionTreeClassifier
+            - adaboost: AdaBoostClassifier
+            - xgboost: XGBClassifier
+
+        Args:
+            model_name (str): Tên model
+            params (Dict, optional): Parameters cho model
+
+        Returns:
+            Sklearn estimator instance
+
+        Raises:
+            ValueError: Nếu model_name không được hỗ trợ
+        """
         params = params or {}
         rs = self.config.get('data', {}).get('random_state', 42)
 
@@ -107,7 +214,20 @@ class ModelTrainer:
             raise ValueError(f"Unknown model: {model_name}")
 
     def _build_pipeline(self, model_name: str, params: Dict = None, sampler: Any = None) -> Tuple[Any, Dict]:
-        """Tạo Pipeline [Sampler -> Model]"""
+        """
+        Tạo Pipeline [Sampler -> Model] cho imbalanced data.
+
+        Nếu có sampler (SMOTE/SMOTETomek), tạo imblearn Pipeline.
+        Nếu không, trả về model đơn lẻ.
+
+        Args:
+            model_name (str): Tên model
+            params (Dict, optional): Parameters cho model
+            sampler: Resampler object (SMOTE, SMOTETomek, etc.)
+
+        Returns:
+            Tuple[estimator, Dict]: (Pipeline hoặc Model, pipeline_params)
+        """
         base_model = self._get_model_instance(model_name)
         params = params or {}
 
@@ -123,7 +243,20 @@ class ModelTrainer:
     # ==================== TRAINING & OPTIMIZATION ====================
 
     def train_model(self, model_name: str, params: Dict = None, sampler: Any = None) -> Any:
-        """Train đơn giản (Baseline)"""
+        """
+        Train model với baseline parameters (không tuning).
+
+        Args:
+            model_name (str): Tên model
+            params (Dict, optional): Custom parameters
+            sampler: Resampler cho imbalanced data
+
+        Returns:
+            Trained model (estimator hoặc Pipeline)
+
+        Example:
+            >>> model = trainer.train_model('random_forest')
+        """
         if self.logger: self.logger.info(f"\n[TRAINING] {model_name.upper()}")
 
         estimator, pipe_params = self._build_pipeline(model_name, params, sampler=sampler)
@@ -139,7 +272,21 @@ class ModelTrainer:
         return estimator
 
     def optimize_params(self, model_name: str, sampler: Any = None) -> Tuple[Any, Dict]:
-        """Gọi Optimizer để tuning"""
+        """
+        Train model với hyperparameter optimization.
+
+        Delegate cho ModelOptimizer để thực hiện GridSearch/RandomizedSearch.
+
+        Args:
+            model_name (str): Tên model
+            sampler: Resampler cho imbalanced data
+
+        Returns:
+            Tuple[model, Dict]: (Best model, best parameters)
+
+        Example:
+            >>> best_model, best_params = trainer.optimize_params('xgboost', sampler=smote)
+        """
         # 1. Build estimator (Pipeline hoặc Model trần)
         estimator, _ = self._build_pipeline(model_name, sampler=sampler)
 
@@ -157,15 +304,29 @@ class ModelTrainer:
         self.models[model_name] = best_model
         return best_model, best_params
 
-    def set_sampler(self, sampler: Any) -> None:
-        """Inject sampler cho imbalanced data handling"""
-        self.sampler = sampler
-        if self.logger:
-            sampler_name = type(sampler).__name__ if sampler else 'None'
-            self.logger.info(f"Resampler Injected | Type: {sampler_name}")
 
     def train_all_models(self, optimize: bool = True, sampler: Any = None) -> Dict[str, Dict]:
-        """Train tất cả models trong config"""
+        """
+        Train tất cả models được định nghĩa trong config.
+
+        Batch training với logging chi tiết.
+
+        Args:
+            optimize (bool): True để tuning hyperparameters, False cho baseline
+            sampler: Resampler cho imbalanced data
+
+        Returns:
+            Dict[str, Dict]: Dictionary chứa metrics của tất cả models
+                {model_name: {accuracy, precision, recall, f1, roc_auc}}
+
+        Raises:
+            ValueError: Nếu không có models trong config
+
+        Example:
+            >>> metrics = trainer.train_all_models(optimize=True, sampler=smote)
+            >>> print(metrics['xgboost']['f1'])
+            0.9347
+        """
         model_names = list(self.config.get('models', {}).keys())
         if not model_names: raise ValueError("No models defined in config")
 
@@ -202,7 +363,23 @@ class ModelTrainer:
     # ==================== HELPERS ====================
 
     def evaluate(self, model_name: str) -> Dict:
-        """Evaluate single model (dùng cho single model training từ pipeline)"""
+        """
+        Evaluate một model đã train.
+
+        Delegate cho ModelEvaluator để tính metrics.
+
+        Args:
+            model_name (str): Tên model đã train
+
+        Returns:
+            Dict: Kết quả evaluation chứa:
+                - metrics: {accuracy, precision, recall, f1, roc_auc}
+                - confusion_matrix: Confusion matrix array
+                - roc_curve_data: (fpr, tpr, auc) tuple
+
+        Raises:
+            ValueError: Nếu model chưa được train
+        """
         model = self.models.get(model_name)
         if not model:
             raise ValueError(f"Model {model_name} not found")
@@ -212,7 +389,19 @@ class ModelTrainer:
         return eval_result
 
     def select_best_model(self, all_metrics: Dict[str, Dict]) -> None:
-        """Chọn model tốt nhất"""
+        """
+        Chọn model tốt nhất dựa trên scoring metric.
+
+        Args:
+            all_metrics (Dict): Metrics của tất cả models
+
+        Sets:
+            self.best_model: Best trained model
+            self.best_model_name: Tên model tốt nhất
+
+        Config:
+            tuning.scoring: Metric để so sánh (default: 'f1')
+        """
         scoring_metric = self.config.get('tuning', {}).get('scoring', 'f1')
         best_score = -1
         best_name = None
@@ -232,7 +421,30 @@ class ModelTrainer:
                 self.logger.info("-" * 70)
 
     def get_feature_importance(self, model_name: str = None, top_n: int = 20) -> Optional[pd.DataFrame]:
-        """Lấy feature importance"""
+        """
+        Lấy feature importance từ tree-based model.
+
+        Chỉ hoạt động với models có attribute feature_importances_:
+            - RandomForest
+            - XGBoost
+            - DecisionTree
+            - AdaBoost
+
+        Args:
+            model_name (str, optional): Tên model. Mặc định là best_model
+            top_n (int): Số features cần lấy
+
+        Returns:
+            pd.DataFrame: DataFrame với columns ['feature', 'importance']
+            None: Nếu model không hỗ trợ feature importance
+
+        Example:
+            >>> importance = trainer.get_feature_importance(top_n=10)
+            >>> print(importance.head())
+               feature  importance
+            0  feature_1    0.25
+            1  feature_2    0.18
+        """
         if model_name is None:
             model_name = self.best_model_name
             model = self.best_model

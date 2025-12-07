@@ -21,64 +21,57 @@ class TestEDAVisualizer:
         assert os.path.exists(viz.eda_dir)
 
     def test_plot_missing_values(self, test_config, sample_raw_df_with_missing, temp_artifacts_dir):
-        """Test plot_missing_values tạo plot"""
+        """Test plot_missing_values"""
         viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
-
         viz.plot_missing_values(sample_raw_df_with_missing)
-
         assert os.path.exists(os.path.join(viz.eda_dir, 'missing_values.png'))
 
-    def test_plot_missing_values_no_missing(self, test_config, sample_raw_df, temp_artifacts_dir):
-        """Test plot_missing_values không tạo plot khi không có missing"""
-        viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
-
-        viz.plot_missing_values(sample_raw_df)
-
-        # Should not create file if no missing values
-        # (behavior depends on implementation)
-
     def test_plot_target_distribution(self, test_config, sample_raw_df, temp_artifacts_dir):
-        """Test plot_target_distribution tạo donut chart"""
+        """Test plot_target_distribution"""
         viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
-
         viz.plot_target_distribution(sample_raw_df['Churn'])
-
         assert os.path.exists(os.path.join(viz.eda_dir, 'target_distribution.png'))
-
-    def test_plot_correlation_matrix(self, test_config, sample_raw_df, temp_artifacts_dir):
-        """Test plot_correlation_matrix tạo heatmap"""
-        viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
-
-        # Use raw df which has more numeric columns
-        viz.plot_correlation_matrix(sample_raw_df)
-
-        # File may not be created if not enough numeric columns
-        # Just check no error is raised
 
     def test_plot_numerical_distributions(self, test_config, sample_raw_df, temp_artifacts_dir):
-        """Test plot_numerical_distributions tạo histograms"""
+        """Test plot_numerical_distributions"""
         viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
-
-        numerical_cols = ['Tenure', 'WarehouseToHome', 'CashbackAmount']
-        viz.plot_numerical_distributions(sample_raw_df, numerical_cols)
-
+        num_cols = ['Tenure', 'WarehouseToHome', 'CashbackAmount']
+        viz.plot_numerical_distributions(sample_raw_df, num_cols)
         assert os.path.exists(os.path.join(viz.eda_dir, 'numerical_distributions.png'))
 
-    def test_plot_outliers_boxplot(self, test_config, sample_raw_df, temp_artifacts_dir):
-        """Test plot_outliers_boxplot tạo boxplots"""
+    def test_plot_boxplots(self, test_config, sample_raw_df, temp_artifacts_dir):
+        """Test plot_boxplots"""
         viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
+        num_cols = ['Tenure', 'WarehouseToHome']
+        viz.plot_boxplots(sample_raw_df, num_cols)
+        assert os.path.exists(os.path.join(viz.eda_dir, 'boxplots.png'))
 
-        numerical_cols = ['Tenure', 'WarehouseToHome']
-        viz.plot_outliers_boxplot(sample_raw_df, numerical_cols)
+    def test_plot_correlation_matrix(self, test_config, sample_raw_df, temp_artifacts_dir):
+        """Test plot_correlation_matrix"""
+        viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
+        viz.plot_correlation_matrix(sample_raw_df)
+        assert os.path.exists(os.path.join(viz.eda_dir, 'correlation_matrix.png'))
 
-        assert os.path.exists(os.path.join(viz.eda_dir, 'outliers_boxplot.png'))
+    def test_plot_correlation_with_target(self, test_config, sample_raw_df, temp_artifacts_dir):
+        """Test plot_correlation_with_target"""
+        viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
+        viz.plot_correlation_with_target(sample_raw_df, 'Churn')
+        assert os.path.exists(os.path.join(viz.eda_dir, 'correlation_with_target.png'))
 
-    def test_save_plot_logs_correctly(self, test_config, sample_raw_df, temp_artifacts_dir, mock_logger):
-        """Test _save_plot logs đúng format"""
+    def test_plot_churn_by_category(self, test_config, sample_raw_df, temp_artifacts_dir):
+        """Test plot_churn_by_category"""
+        viz = EDAVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
+        viz.plot_churn_by_category(sample_raw_df, 'Churn')
+        assert os.path.exists(os.path.join(viz.eda_dir, 'churn_by_category.png'))
+
+    def test_run_full_eda(self, test_config, sample_raw_df, temp_artifacts_dir, mock_logger):
+        """Test run_full_eda tạo tất cả plots"""
         viz = EDAVisualizer(test_config, mock_logger, temp_artifacts_dir)
+        viz.run_full_eda(sample_raw_df, 'Churn')
 
-        viz.plot_target_distribution(sample_raw_df['Churn'])
-
-        # Logger should have been called (check logs manually or mock)
+        # Check plots created
         assert os.path.exists(os.path.join(viz.eda_dir, 'target_distribution.png'))
+        assert os.path.exists(os.path.join(viz.eda_dir, 'numerical_distributions.png'))
+        assert os.path.exists(os.path.join(viz.eda_dir, 'boxplots.png'))
+        assert os.path.exists(os.path.join(viz.eda_dir, 'correlation_matrix.png'))
 

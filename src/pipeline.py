@@ -1,7 +1,38 @@
 """
 src/pipeline.py
-Main ML Pipeline Orchestrator (Refactored & Complete)
-Điều phối: Data -> Ops -> Training -> Evaluation -> Visualization
+
+Main ML Pipeline Orchestrator
+
+Module này là entry point chính điều phối toàn bộ ML pipeline:
+    - Stage 1: EDA (Exploratory Data Analysis)
+    - Stage 2: Preprocessing (Load → Clean → Split → Transform)
+    - Stage 3: Training (Model training với hyperparameter optimization)
+    - Stage 4: Visualization & Explainability (Plots, SHAP, Reports)
+
+Supported Modes:
+    - 'full': Chạy toàn bộ pipeline từ đầu đến cuối
+    - 'eda': Chỉ chạy EDA
+    - 'preprocess': Chỉ chạy preprocessing
+    - 'train': Chỉ chạy training (yêu cầu đã có train/test data)
+    - 'visualize': Chỉ chạy visualization
+
+Architecture:
+    Pipeline sử dụng Composition pattern, sở hữu các components:
+    - DataPreprocessor, DataTransformer (Data module)
+    - ModelTrainer (Models module)
+    - EDAVisualizer, EvaluateVisualizer (Visualization module)
+    - ExperimentTracker, ModelRegistry, etc. (Ops module)
+
+Example:
+    >>> from src.pipeline import Pipeline
+    >>> from src.utils import ConfigLoader, Logger
+    >>>
+    >>> config = ConfigLoader.load_config('config/config.yaml')
+    >>> logger = Logger.get_logger('MAIN')
+    >>> pipeline = Pipeline(config, logger)
+    >>> trainer, metrics = pipeline.run(mode='full', optimize=True)
+
+Author: Churn Prediction Team
 """
 import os
 import shutil
@@ -14,18 +45,45 @@ from .models import ModelTrainer
 from .visualization import EDAVisualizer, EvaluateVisualizer
 from .ops import (
     ExperimentTracker, ModelRegistry, DataValidator,
-    DataVersioning, ModelMonitor, ModelExplainer
+    DataVersioning, ModelMonitor, ModelExplainer, BatchDataLoader
 )
-from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timestamp, ensure_dir, Logger
+from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timestamp, ensure_dir, Logger, ReportGenerator
 
 
 class Pipeline:
     """
-    Main ML Pipeline với luồng xử lý chuẩn công nghiệp:
-    RAW -> CLEAN (Preprocessor) -> SPLIT -> FIT/TRANSFORM (Transformer) -> TRAIN -> EVAL
+    Main ML Pipeline Orchestrator.
+    Điều phối toàn bộ workflow từ raw data đến trained model:
+        RAW → CLEAN → SPLIT → TRANSFORM → TRAIN → EVALUATE → VISUALIZE
+    Attributes:
+        config (Dict): Configuration dictionary
+        logger: Logger instance
+        target_col (str): Tên cột target
+        tracker (ExperimentTracker): Experiment tracking
+        registry (ModelRegistry): Model registry
+        validator (DataValidator): Data validation
+        versioning (DataVersioning): Data versioning
+        monitor (ModelMonitor): Model monitoring
+        report_generator (ReportGenerator): Report generation
+        preprocessor (DataPreprocessor): Data preprocessing
+        transformer (DataTransformer): Data transformation
+        trainer (ModelTrainer): Model training
+        eda_viz (EDAVisualizer): EDA visualization
+        eval_viz (EvaluateVisualizer): Evaluation visualization
+    Example:
+        >>> pipeline = Pipeline(config, logger)
+        >>> trainer, metrics = pipeline.run(mode='full', optimize=True)
+        >>> print(f"Best model: {trainer.best_model_name}")
     """
 
     def __init__(self, config: Dict[str, Any], logger: logging.Logger):
+        """
+        Khởi tạo Pipeline với tất cả components.
+
+        Args:
+            config (Dict[str, Any]): Configuration dictionary từ config.yaml
+            logger (logging.Logger): Logger instance
+        """
         self.config = config
         self.logger = logger
         self.target_col = config['data']['target_col']
@@ -37,8 +95,9 @@ class Pipeline:
         self.tracker = ExperimentTracker(config['experiments']['base_dir'])
         self.registry = ModelRegistry(config['mlops']['registry_dir'])
         self.validator = DataValidator(logger)
-        self.versioning = DataVersioning(config['dataops']['versions_dir'])
+        self.versioning = DataVersioning(config['dataops']['versions_dir'], logger)
         self.monitor = ModelMonitor(config['monitoring']['base_dir'])
+        self.report_generator = ReportGenerator(config['experiments']['base_dir'], logger)
 
         # --- 2. SETUP CORE COMPONENTS ---
         # Data
@@ -68,10 +127,12 @@ class Pipeline:
         # 1. Load Data (Support Batch Folder or Single File)
         raw_path = self.config['data']['raw_path']
         batch_folder = self.config['data'].get('batch_folder')
+        batch_files = self.config['data'].get('batch_files')  # Filtered files từ CLI
 
         if raw_path.lower() == 'full' and batch_folder:
-            self.logger.info(f"Loading batch data from: {batch_folder}")
-            df = IOHandler.read_batch_folder(batch_folder)
+            # Sử dụng BatchDataLoader để nhất quán với run_preprocessing()
+            batch_loader = BatchDataLoader(batch_folder, self.logger)
+            df = batch_loader.load_all(deduplicate=True, file_list=batch_files)
         else:
             df = self.preprocessor.load_data(raw_path)
 
@@ -83,20 +144,8 @@ class Pipeline:
             eda_dir = os.path.join(self.tracker.current_run_dir, 'figures', 'eda')
             self.eda_viz = EDAVisualizer(self.config, self.logger, run_specific_dir=os.path.dirname(eda_dir))
 
-        self.eda_viz.plot_missing_values(df)
-        self.eda_viz.plot_correlation_matrix(df)
-
-        if self.target_col in df.columns:
-            self.eda_viz.plot_target_distribution(df[self.target_col])
-
-        numerical_cols = df.select_dtypes(include=['number']).columns.tolist()
-        # Helper to identify types for plotting distributions
-        if self.target_col in numerical_cols:
-            numerical_cols.remove(self.target_col)
-
-        if numerical_cols:
-            self.eda_viz.plot_numerical_distributions(df, numerical_cols)
-            self.eda_viz.plot_outliers_boxplot(df, numerical_cols)
+        # Chạy Full EDA với tất cả plots cần thiết
+        self.eda_viz.run_full_eda(df, self.target_col)
 
         self.logger.info(f"EDA Completed. Check {self.eda_viz.eda_dir}")
 
@@ -113,17 +162,32 @@ class Pipeline:
         self.logger.info("=" * 70)
 
         raw_path = self.config['data']['raw_path']
+        batch_folder = self.config['data'].get('batch_folder')
+        batch_files = self.config['data'].get('batch_files')  # Filtered files từ CLI
 
-        # 1. DataOps: Version tracking
-        source_path = self.config['data'].get('batch_folder') if raw_path.lower() == 'full' else raw_path
-        ver_id = self.versioning.create_version(source_path)
-        self.logger.info(f"Data Version  | {ver_id}")
+        # 1. Load Data - Hỗ trợ batch loading (multiple files)
+        if raw_path.lower() == 'full' and batch_folder:
+            # Use BatchDataLoader cho incremental data
+            batch_loader = BatchDataLoader(batch_folder, self.logger)
+            df = batch_loader.load_all(deduplicate=True, file_list=batch_files)
+            source_path = batch_folder
 
-        # 2. Load
-        if raw_path.lower() == 'full':
-            df = IOHandler.read_batch_folder(source_path)
+            if self.logger:
+                status = batch_loader.get_status()
+                self.logger.info(f"Batch Status  | Files: {status['total_files']} | Rows: {status['total_rows_loaded']:,}")
         else:
             df = self.preprocessor.load_data(raw_path)
+            source_path = raw_path
+
+        # 2. DataOps: Version tracking for RAW data (với đầy đủ metadata)
+        ver_id = self.versioning.create_version(
+            file_path=source_path,
+            dataset_name="raw_data",
+            df=df,
+            description="Raw input data",
+            tags=["raw", "input"]
+        )
+        self.logger.info(f"Data Version  | {ver_id} (raw)")
 
         # 3. Clean (Stateless)
         df_clean = self.preprocessor.clean_data(df)
@@ -134,6 +198,17 @@ class Pipeline:
         processed_path = os.path.join(processed_dir,
                                       f"{os.path.splitext(os.path.basename(raw_path))[0]}_cleaned.parquet")
         IOHandler.save_data(df_clean, processed_path)
+
+        # DataOps: Version tracking for CLEANED data
+        self.versioning.create_version(
+            file_path=processed_path,
+            dataset_name="cleaned_data",
+            df=df_clean,
+            description="Data after cleaning",
+            tags=["cleaned", "processed"]
+        )
+        # Add lineage: cleaned <- raw
+        self.versioning.add_lineage("cleaned_data", "raw_data", "cleaning")
 
         # 4. Split
         train_df, test_df = self.preprocessor.split_data(df_clean)
@@ -163,11 +238,30 @@ class Pipeline:
         self.logger.info(f"Saved: {train_path} ({train_processed.shape})")
         self.logger.info(f"Saved: {test_path} ({test_processed.shape})")
 
+        # DataOps: Version tracking for TRAIN/TEST data
+        self.versioning.create_version(
+            file_path=train_path,
+            dataset_name="train_data",
+            df=train_processed,
+            description="Training dataset (transformed)",
+            tags=["train", "final"]
+        )
+        self.versioning.create_version(
+            file_path=test_path,
+            dataset_name="test_data",
+            df=test_processed,
+            description="Test dataset (transformed)",
+            tags=["test", "final"]
+        )
+        # Add lineage
+        self.versioning.add_lineage("train_data", "cleaned_data", "split+transform")
+        self.versioning.add_lineage("test_data", "cleaned_data", "split+transform")
+
         # 7. Validate Output Quality
         self.logger.info("=" * 60)
         self.logger.info("PREPROCESSING COMPLETED")
-        self.logger.info(" --- Data Quality Check ---")
-        self.validator.validate_quality(train_processed)
+        quality = self.validator.validate_quality(train_processed)
+        self.logger.info(f"Data Quality  | Null: {quality['null_ratio']:.2%} | Dup: {quality['duplicate_ratio']:.2%}")
 
         return processed_path, train_path, test_path
 
@@ -247,6 +341,18 @@ class Pipeline:
                 self.logger.warning(f"Model Health: {health['status']} - Issues: {health['issues']}")
             else:
                 self.logger.info(f"Model Health: {health['status']}")
+
+            # Generate Training Report
+            feature_importance = self.trainer.get_feature_importance()
+            report_path = self.report_generator.generate_training_report(
+                run_id=self.tracker.current_run_id or get_timestamp(),
+                best_model_name=self.trainer.best_model_name,
+                all_metrics=metrics,
+                feature_importance=feature_importance,
+                config=self.config,
+                format='markdown'
+            )
+            self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
 
         return self.trainer, metrics
 

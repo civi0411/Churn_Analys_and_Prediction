@@ -13,6 +13,7 @@ from src.ops.mlops import (
     ModelMonitor,
     ModelExplainer
 )
+from src.utils import ReportGenerator
 from sklearn.ensemble import RandomForestClassifier
 
 
@@ -295,4 +296,99 @@ class TestModelExplainer:
 
         # Should extract the actual model from pipeline
         assert isinstance(explainer.model, RandomForestClassifier)
+
+
+class TestReportGenerator:
+    """Test cases for ReportGenerator class"""
+
+    def test_init(self, temp_dir):
+        """Test khởi tạo ReportGenerator"""
+        report_dir = os.path.join(temp_dir, 'reports')
+        generator = ReportGenerator(report_dir)
+
+        assert os.path.exists(report_dir)
+
+    def test_generate_markdown_report(self, temp_dir):
+        """Test generate_training_report tạo markdown"""
+        generator = ReportGenerator(temp_dir)
+
+        all_metrics = {
+            'random_forest': {'accuracy': 0.95, 'precision': 0.90, 'recall': 0.88, 'f1': 0.89, 'roc_auc': 0.94},
+            'xgboost': {'accuracy': 0.97, 'precision': 0.93, 'recall': 0.91, 'f1': 0.92, 'roc_auc': 0.96}
+        }
+
+        report_path = generator.generate_training_report(
+            run_id='test_run_001',
+            best_model_name='xgboost',
+            all_metrics=all_metrics,
+            format='markdown'
+        )
+
+        assert os.path.exists(report_path)
+        assert report_path.endswith('.md')
+
+        # Check content
+        with open(report_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            assert 'XGBOOST' in content
+            assert '0.9200' in content  # F1 score
+
+    def test_generate_json_report(self, temp_dir):
+        """Test generate_training_report tạo JSON"""
+        generator = ReportGenerator(temp_dir)
+
+        all_metrics = {
+            'random_forest': {'accuracy': 0.95, 'f1': 0.89}
+        }
+
+        report_path = generator.generate_training_report(
+            run_id='test_run_002',
+            best_model_name='random_forest',
+            all_metrics=all_metrics,
+            format='json'
+        )
+
+        assert os.path.exists(report_path)
+        assert report_path.endswith('.json')
+
+    def test_generate_report_with_feature_importance(self, temp_dir):
+        """Test generate report với feature importance"""
+        generator = ReportGenerator(temp_dir)
+
+        all_metrics = {'xgboost': {'f1': 0.92}}
+        feature_importance = pd.DataFrame({
+            'feature': ['feature_1', 'feature_2', 'feature_3'],
+            'importance': [0.5, 0.3, 0.2]
+        })
+
+        report_path = generator.generate_training_report(
+            run_id='test_run_003',
+            best_model_name='xgboost',
+            all_metrics=all_metrics,
+            feature_importance=feature_importance,
+            format='markdown'
+        )
+
+        with open(report_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            assert 'Feature Importance' in content
+            assert 'feature_1' in content
+
+    def test_generate_report_with_config(self, temp_dir, test_config):
+        """Test generate report với config summary"""
+        generator = ReportGenerator(temp_dir)
+
+        all_metrics = {'xgboost': {'f1': 0.92}}
+
+        report_path = generator.generate_training_report(
+            run_id='test_run_004',
+            best_model_name='xgboost',
+            all_metrics=all_metrics,
+            config=test_config,
+            format='markdown'
+        )
+
+        with open(report_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            assert 'Configuration' in content
 

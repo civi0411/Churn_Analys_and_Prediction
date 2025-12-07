@@ -1,6 +1,41 @@
 """
 src/ops/mlops.py
-ML Operations: Experiment Tracking, Model Registry, Monitoring, Explainability
+
+ML Operations Module - Quản lý vòng đời ML Models
+
+Module này cung cấp các công cụ MLOps:
+    - ExperimentTracker: Theo dõi experiments và runs
+    - ModelRegistry: Quản lý phiên bản models
+    - ModelMonitor: Giám sát performance và phát hiện drift
+    - ModelExplainer: Giải thích model với SHAP
+    - ReportGenerator: Tạo báo cáo tự động
+
+Tính năng chính:
+    - Experiment Tracking: Log params, metrics, artifacts
+    - Model Versioning: Lưu và quản lý các phiên bản model
+    - Performance Monitoring: Theo dõi metrics theo thời gian
+    - Drift Detection: Phát hiện suy giảm performance
+    - Health Check: Kiểm tra sức khỏe model
+    - Model Explainability: SHAP values và feature importance
+    - Auto Reporting: Tạo báo cáo Markdown/JSON
+
+Example:
+    >>> # Experiment Tracking
+    >>> tracker = ExperimentTracker('artifacts/experiments')
+    >>> tracker.start_run('run_001')
+    >>> tracker.log_params({'learning_rate': 0.01})
+    >>> tracker.log_metrics({'f1': 0.92})
+    >>> tracker.end_run()
+
+    >>> # Model Registry
+    >>> registry = ModelRegistry('artifacts/model_registry')
+    >>> registry.register_model('xgboost', model, metrics)
+
+    >>> # Report Generation
+    >>> reporter = ReportGenerator('artifacts/reports')
+    >>> reporter.generate_training_report(run_id, best_model, metrics)
+
+Author: Churn Prediction Team
 """
 import os
 import pandas as pd
@@ -12,11 +47,43 @@ from ..utils import IOHandler, ensure_dir
 
 class ExperimentTracker:
     """
-    Custom Experiment Tracker - Thay thế MLflow
-    Lưu trữ experiments và runs vào CSV/JSON
+    Custom Experiment Tracker - Thay thế MLflow.
+
+    Lưu trữ experiments và runs vào CSV/JSON files.
+    Mỗi run được lưu trong thư mục riêng với params, metrics, artifacts.
+
+    Attributes:
+        base_dir (str): Thư mục gốc lưu experiments
+        experiments_file (str): File CSV lưu danh sách runs
+        current_run_id (str): ID của run hiện tại
+        current_run_dir (str): Thư mục của run hiện tại
+
+    Directory Structure:
+        artifacts/experiments/
+        ├── experiments.csv          # Danh sách tất cả runs
+        ├── run_001/
+        │   ├── params.json          # Parameters
+        │   ├── metrics.json         # Metrics
+        │   ├── metadata.json        # Environment info
+        │   └── artifacts/           # Artifacts (models, plots)
+        └── run_002/
+            └── ...
+
+    Example:
+        >>> tracker = ExperimentTracker('artifacts/experiments')
+        >>> tracker.start_run('experiment_001')
+        >>> tracker.log_params({'n_estimators': 100})
+        >>> tracker.log_metrics({'accuracy': 0.95, 'f1': 0.92})
+        >>> tracker.end_run('FINISHED')
     """
 
     def __init__(self, base_dir: str = "artifacts/experiments"):
+        """
+        Khởi tạo ExperimentTracker.
+
+        Args:
+            base_dir (str): Thư mục gốc lưu experiments
+        """
         self.base_dir = base_dir
         self.experiments_file = os.path.join(base_dir, "experiments.csv")
         ensure_dir(base_dir)
@@ -33,7 +100,17 @@ class ExperimentTracker:
         self.run_start_time = None
 
     def start_run(self, run_name: str = None) -> str:
-        """Bắt đầu một run mới"""
+        """
+        Bắt đầu một run mới.
+
+        Tạo thư mục riêng cho run và log vào experiments file.
+
+        Args:
+            run_name (str, optional): Tên run. Mặc định là timestamp
+
+        Returns:
+            str: Run ID
+        """
         self.run_start_time = datetime.now()
         if run_name is None:
            run_name = self.run_start_time.strftime('%Y%m%d_%H%M%S')
@@ -531,3 +608,9 @@ class ModelExplainer:
             else:
                 print(f"[ERROR] {msg}")
             return False
+
+
+# Note: ReportGenerator đã được chuyển sang src/utils.py
+# để có thể tạo report cho EDA, Data, Training (cross-cutting concern)
+
+

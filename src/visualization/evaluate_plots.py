@@ -1,6 +1,32 @@
 """
 src/visualization/evaluate_plots.py
-Model Evaluation & Performance Visualization
+Model Evaluation & Performance Visualization Module
+
+Module này tạo các biểu đồ đánh giá model performance:
+    - Confusion Matrix: Ma trận nhầm lẫn với số lượng và tỷ lệ %
+    - ROC Curve: So sánh ROC curves của nhiều models
+    - Feature Importance: Bar chart top N features quan trọng
+    - Model Comparison: Grouped bar chart so sánh metrics
+
+Features:
+    - Tự động lưu plots vào thư mục artifacts
+    - Style nhất quán với seaborn
+    - Hỗ trợ so sánh nhiều models trên cùng 1 plot
+
+Output:
+    Các file PNG được lưu vào: artifacts/figures/evaluation/
+    - confusion_matrix_{model}.png
+    - roc_curve.png
+    - feature_importance_top_N.png
+    - model_comparison.png
+
+Example:
+    >>> visualizer = EvaluateVisualizer(config, logger)
+    >>> visualizer.plot_confusion_matrix(y_true, y_pred, 'xgboost')
+    >>> visualizer.plot_roc_curve(roc_data_dict)
+    >>> visualizer.plot_model_comparison(metrics_dict)
+
+Author: Churn Prediction Team
 """
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -13,7 +39,34 @@ from ..utils import ensure_dir
 
 
 class EvaluateVisualizer:
+    """
+    Evaluate Visualizer - Tạo các biểu đồ đánh giá model.
+
+    Tất cả plots được tự động lưu vào thư mục artifacts/figures/evaluation/
+    với DPI cao (300) cho quality tốt.
+
+    Attributes:
+        config (dict): Configuration dictionary
+        logger: Logger instance
+        save_dir (str): Thư mục lưu plots
+        eval_dir (str): Thư mục evaluation cụ thể
+
+    Example:
+        >>> viz = EvaluateVisualizer(config, logger)
+        >>> viz.plot_confusion_matrix(y_true, y_pred, 'xgboost')
+        >>> viz.plot_roc_curve({'xgboost': (fpr, tpr, auc)})
+    """
+
     def __init__(self, config: dict, logger=None, run_specific_dir=None):
+        """
+        Khởi tạo EvaluateVisualizer.
+
+        Args:
+            config (dict): Configuration dictionary chứa:
+                - artifacts.figures_dir: Thư mục lưu figures
+            logger: Logger instance (optional)
+            run_specific_dir (str, optional): Thư mục cho run cụ thể
+        """
         self.config = config
         self.logger = logger
         self.save_dir = run_specific_dir or config.get('artifacts', {}).get('figures_dir', 'artifacts/figures')
@@ -23,6 +76,13 @@ class EvaluateVisualizer:
         sns.set_style("whitegrid")
 
     def _save_plot(self, fig, filename: str):
+        """
+        Helper để lưu figure và log.
+
+        Args:
+            fig: Matplotlib figure
+            filename (str): Tên file (sẽ lưu vào eval_dir)
+        """
         path = os.path.join(self.eval_dir, filename)
         fig.savefig(path, bbox_inches='tight', dpi=300)
         plt.close(fig)
@@ -30,7 +90,20 @@ class EvaluateVisualizer:
             self.logger.info(f"Saved Plot      | EVALUATION | {filename}")
 
     def plot_confusion_matrix(self, y_true, y_pred, model_name: str):
-        """Confusion Matrix đẹp với số lượng và %"""
+        """
+        Vẽ Confusion Matrix với số lượng và tỷ lệ %.
+
+        Hiển thị cả số lượng tuyệt đối và tỷ lệ phần trăm
+        trong mỗi ô của confusion matrix.
+
+        Args:
+            y_true: Ground truth labels
+            y_pred: Predicted labels
+            model_name (str): Tên model (để đặt tên file)
+
+        Output:
+            Saves: confusion_matrix_{model_name}.png
+        """
         cm = confusion_matrix(y_true, y_pred)
 
         # Calculate percentages
@@ -61,8 +134,24 @@ class EvaluateVisualizer:
 
     def plot_roc_curve(self, roc_data_dict: Dict[str, tuple]):
         """
-        Vẽ nhiều ROC Curve trên cùng 1 biểu đồ để so sánh
-        roc_data_dict: { 'ModelName': (fpr, tpr, auc_score) }
+        Vẽ nhiều ROC Curves trên cùng 1 biểu đồ để so sánh.
+
+        ROC (Receiver Operating Characteristic) curve thể hiện
+        trade-off giữa True Positive Rate và False Positive Rate.
+
+        Args:
+            roc_data_dict (Dict[str, tuple]): Dictionary chứa ROC data
+                Format: {'ModelName': (fpr, tpr, auc_score)}
+
+        Output:
+            Saves: roc_curve.png
+
+        Example:
+            >>> roc_data = {
+            ...     'XGBoost': (fpr1, tpr1, 0.995),
+            ...     'Random Forest': (fpr2, tpr2, 0.991)
+            ... }
+            >>> viz.plot_roc_curve(roc_data)
         """
         fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -80,7 +169,18 @@ class EvaluateVisualizer:
         self._save_plot(fig, "roc_curve.png")
 
     def plot_feature_importance(self, importance_df: pd.DataFrame, top_n=20):
-        """Feature Importance - Horizontal Bar Chart"""
+        """
+        Vẽ Feature Importance dạng Horizontal Bar Chart.
+
+        Hiển thị top N features quan trọng nhất với importance score.
+
+        Args:
+            importance_df (pd.DataFrame): DataFrame với columns ['feature', 'importance']
+            top_n (int): Số features cần hiển thị (default: 20)
+
+        Output:
+            Saves: feature_importance_top_{top_n}.png
+        """
         if importance_df is None or importance_df.empty: return
 
         df_plot = importance_df.head(top_n).sort_values('importance', ascending=True)
@@ -101,8 +201,24 @@ class EvaluateVisualizer:
 
     def plot_model_comparison(self, metrics_dict: Dict[str, Dict], metrics_to_plot=['accuracy', 'f1', 'recall']):
         """
-        Grouped Bar Chart so sánh các metrics giữa các models
-        metrics_dict: {'Logistic': {'accuracy': 0.8, ...}, 'RF': {...}}
+        Vẽ Grouped Bar Chart so sánh metrics giữa các models.
+
+        Mỗi model sẽ có một nhóm bars thể hiện các metrics khác nhau.
+
+        Args:
+            metrics_dict (Dict[str, Dict]): Dictionary chứa metrics của các models
+                Format: {'ModelName': {'accuracy': 0.95, 'f1': 0.92, ...}}
+            metrics_to_plot (List[str]): Danh sách metrics cần so sánh
+
+        Output:
+            Saves: model_comparison.png
+
+        Example:
+            >>> metrics = {
+            ...     'XGBoost': {'accuracy': 0.978, 'f1': 0.935, 'recall': 0.942},
+            ...     'Random Forest': {'accuracy': 0.961, 'f1': 0.888, 'recall': 0.915}
+            ... }
+            >>> viz.plot_model_comparison(metrics)
         """
         data = []
         for model_name, metrics in metrics_dict.items():
