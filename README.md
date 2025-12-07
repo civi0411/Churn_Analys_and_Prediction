@@ -263,7 +263,8 @@ graph TB
 ├── 📂 src/                              # 💻 MÃ NGUỒN CHÍNH
 │   ├── 📄 __init__.py
 │   ├── 📄 pipeline.py                   # 🔄 Orchestrator - điều phối toàn bộ pipeline
-│   ├── 📄 utils.py                      # 🛠️ Tiện ích: Logger, IOHandler, ConfigLoader
+│   ├── 📄 utils.py                      # 🛠️ Utilities: Logger, IOHandler, ConfigLoader,
+│   │                                    #    get_files_in_folder(), filter_files_by_date()
 │   │
 │   ├── 📂 data/                         # 📊 MODULE XỬ LÝ DỮ LIỆU
 │   │   ├── 📄 __init__.py
@@ -276,9 +277,9 @@ graph TB
 │   │   ├── 📄 optimizer.py              # Hyperparameter tuning (RandomizedSearch)
 │   │   └── 📄 evaluator.py              # Metrics calculation, evaluation logic
 │   │
-│   ├── 📂 ops/                          # ⚡ MODULE MLOPS
+│   ├── 📂 ops/                          # ⚡ MODULE DATAOPS + MLOPS
 │   │   ├── 📄 __init__.py
-│   │   ├── 📄 dataops.py                # DataValidator, DataVersioning
+│   │   ├── 📄 dataops.py                # DataValidator, DataVersioning, BatchDataLoader
 │   │   └── 📄 mlops.py                  # ExperimentTracker, ModelRegistry, Monitor, Explainer
 │   │
 │   └── 📂 visualization/                # 📈 MODULE VISUALIZATION
@@ -383,12 +384,14 @@ graph TB
 | `src/pipeline.py` | Orchestrator điều phối các stages | Entry point logic cho các modes (eda, train, full...) |
 | `src/data/preprocessor.py` | Clean và split data (stateless) | Xử lý dữ liệu thô ban đầu |
 | `src/data/transformer.py` | Feature engineering (stateful) | Học tham số từ train, apply cho test |
+| `src/utils.py` | Utilities: IOHandler, get_files_in_folder, filter_files_by_date | Đọc/ghi files, list/filter files |
 | `src/models/trainer.py` | Training logic | Train và evaluate models |
-| `src/ops/mlops.py` | MLOps components | Tracking, registry, monitoring |
+| `src/ops/dataops.py` | DataOps: BatchDataLoader, DataValidator, DataVersioning | Load batch files, validate, version data |
+| `src/ops/mlops.py` | MLOps: ExperimentTracker, ModelRegistry, ModelMonitor | Tracking, registry, monitoring |
 | `artifacts/experiments/` | Lưu trữ từng run | Review lại experiments cũ |
 | `artifacts/model_registry/` | Models production-ready | Deploy model vào production |
 | `artifacts/monitoring/` | Performance logs | Theo dõi model degradation |
-| `tests/` | Unit & integration tests (77 tests) | CI/CD, đảm bảo code quality |
+| `tests/` | Unit & integration tests | CI/CD, đảm bảo code quality |
 
 ---
 
@@ -775,25 +778,35 @@ python main.py --mode visualize --model random_forest
 
 ## 🧪 Testing (Kiểm thử)
 
-### 📊 Test Coverage
+### 📊 Cấu trúc Tests
 
-Hệ thống có **77 unit tests** được tổ chức theo cấu trúc module tương ứng với `src/`:
+Tests được tổ chức theo cấu trúc module tương ứng với `src/`:
 
-| Module Test | Số Tests | Mô tả |
-|-------------|----------|-------|
-| `test_data/test_preprocessor.py` | 8 | Tests cho DataPreprocessor (clean, split) |
-| `test_data/test_transformer.py` | 12 | Tests cho DataTransformer (impute, encode, scale) |
-| `test_models/test_trainer.py` | 13 | Tests cho ModelTrainer (train, evaluate, save) |
-| `test_models/test_optimizer.py` | 6 | Tests cho ModelOptimizer (GridSearch, RandomizedSearch) |
-| `test_models/test_evaluator.py` | 9 | Tests cho ModelEvaluator (metrics, confusion matrix) |
-| `test_ops/test_dataops.py` | 12 | Tests cho DataValidator, DataVersioning |
-| `test_ops/test_mlops.py` | 19 | Tests cho ExperimentTracker, ModelRegistry, ModelMonitor |
-| `test_visualization/test_eda_plots.py` | 8 | Tests cho EDAVisualizer |
-| `test_visualization/test_evaluate_plots.py` | 9 | Tests cho EvaluateVisualizer |
-| `test_utils.py` | 14 | Tests cho utility functions |
-| `test_pipeline.py` | 5 | Tests cho Pipeline orchestrator |
+```
+tests/
+├── conftest.py                    # Pytest fixtures chung
+├── test_utils.py                  # Tests cho src/utils.py
+├── test_pipeline.py               # Tests cho src/pipeline.py
+│
+├── test_data/
+│   ├── test_preprocessor.py       # DataPreprocessor tests
+│   └── test_transformer.py        # DataTransformer tests
+│
+├── test_models/
+│   ├── test_trainer.py            # ModelTrainer tests
+│   ├── test_optimizer.py          # ModelOptimizer tests
+│   └── test_evaluator.py          # ModelEvaluator tests
+│
+├── test_ops/
+│   ├── test_dataops.py            # DataValidator, DataVersioning, BatchDataLoader
+│   └── test_mlops.py              # ExperimentTracker, ModelRegistry, ModelMonitor
+│
+└── test_visualization/
+    ├── test_eda_plots.py          # EDAVisualizer tests
+    └── test_evaluate_plots.py     # EvaluateVisualizer tests
+```
 
-### 🏃 Các cách chạy Tests
+### 🏃 Cách chạy Tests
 
 ```powershell
 # Chạy tất cả tests
@@ -802,38 +815,121 @@ pytest
 # Chạy với verbose output
 pytest -v
 
-# Chạy theo module cụ thể
-pytest tests/test_data/                     # Tất cả tests cho data module
-pytest tests/test_models/                   # Tất cả tests cho models module
-pytest tests/test_ops/                      # Tất cả tests cho ops module
-pytest tests/test_visualization/            # Tất cả tests cho visualization module
+# Chạy module cụ thể
+pytest tests/test_data/ -v                  # Data module
+pytest tests/test_models/ -v                # Models module
+pytest tests/test_ops/ -v                   # Ops module (DataOps + MLOps)
 
-# Chạy file test cụ thể
-pytest tests/test_data/test_preprocessor.py
-pytest tests/test_models/test_trainer.py
+# Chạy file cụ thể
+pytest tests/test_data/test_preprocessor.py -v
 
 # Chạy test case cụ thể
-pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data_removes_duplicates
-
-# Chạy với coverage
-pytest --cov=src --cov-report=term-missing
-
-# Coverage HTML report
-pytest --cov=src --cov-report=html
-# Sau đó mở: htmlcov/index.html
+pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data -v
 
 # Chạy tests matching pattern
-pytest -k "transformer"
+pytest -k "transformer" -v                  # Tests có chứa "transformer"
+pytest -k "batch" -v                        # Tests liên quan đến batch loading
 
 # Stop khi fail đầu tiên
 pytest -x
 
-# Chạy song song (nhanh hơn)
-pip install pytest-xdist
-pytest -n auto
+# Chạy với coverage report
+pytest --cov=src --cov-report=term-missing
+
+# Coverage HTML report
+pytest --cov=src --cov-report=html
+# Mở file: htmlcov/index.html
 ```
 
-**Coverage hiện tại:** 93% (Target: ≥90%) ✅
+### 📋 Chi tiết Test Cases
+
+#### `test_utils.py` - Utility Functions
+```
+test_ensure_dir_creates_directory        # Tạo thư mục nếu chưa có
+test_set_random_seed                     # Đảm bảo reproducibility
+test_get_timestamp_format                # Format timestamp đúng
+test_get_files_in_folder                 # Lấy danh sách files trong folder
+test_filter_files_by_date                # Filter files theo YYYY-MM pattern
+test_compute_file_hash                   # Hash MD5 cho versioning
+test_config_loader                       # Load YAML config
+test_io_handler_read_write               # Đọc/ghi csv, xlsx, parquet
+```
+
+#### `test_data/test_preprocessor.py` - DataPreprocessor
+```
+test_load_data_excel                     # Load file Excel
+test_load_data_csv                       # Load file CSV
+test_clean_data_removes_duplicates       # Xóa dòng trùng lặp
+test_clean_data_standardizes_columns     # Chuẩn hóa tên cột
+test_split_data_stratified               # Split giữ tỷ lệ target
+test_split_data_ratio                    # Đúng tỷ lệ 80/20
+```
+
+#### `test_data/test_transformer.py` - DataTransformer
+```
+test_fit_transform_returns_tuple         # Trả về (X, y)
+test_transform_uses_learned_params       # Dùng params đã học (no leakage)
+test_handle_missing_numerical            # Impute median cho số
+test_handle_missing_categorical          # Impute mode cho category
+test_handle_outliers_iqr                 # Clip outliers theo IQR
+test_encode_categorical                  # Label encoding
+test_scale_features_standard             # StandardScaler
+test_feature_engineering                 # Tạo features mới
+test_get_resampler_smote                 # Trả về SMOTE object
+```
+
+#### `test_models/test_trainer.py` - ModelTrainer
+```
+test_load_train_test_data                # Load data từ files
+test_train_model_xgboost                 # Train XGBoost
+test_train_model_random_forest           # Train RandomForest
+test_train_all_models                    # Train tất cả models
+test_evaluate_returns_metrics            # Trả về metrics dict
+test_select_best_model                   # Chọn model theo scoring metric
+test_get_feature_importance              # Lấy feature importance
+test_save_load_model                     # Save/load model joblib
+```
+
+#### `test_ops/test_dataops.py` - DataOps
+```
+test_validator_null_ratio                # Tính null ratio
+test_validator_duplicate_ratio           # Tính duplicate ratio
+test_versioning_create_version           # Tạo version mới
+test_versioning_hash_based               # Hash-based versioning
+test_versioning_add_lineage              # Track data lineage
+test_batch_loader_load_all               # Load tất cả files
+test_batch_loader_uses_utils             # Sử dụng get_files_in_folder từ utils
+test_batch_loader_deduplication          # Loại bỏ duplicates
+test_batch_loader_tracking               # Track files đã load
+```
+
+#### `test_ops/test_mlops.py` - MLOps
+```
+test_tracker_start_run                   # Bắt đầu experiment run
+test_tracker_log_params                  # Log parameters
+test_tracker_log_metrics                 # Log metrics
+test_tracker_end_run                     # Kết thúc run
+test_registry_register_model             # Đăng ký model mới
+test_registry_get_latest                 # Lấy model mới nhất
+test_monitor_log_performance             # Log performance metrics
+test_monitor_detect_drift                # Phát hiện performance drift
+test_monitor_health_check                # Kiểm tra model health
+test_explainer_feature_importance        # Feature importance
+test_explainer_shap                      # SHAP explanations
+```
+
+### ✅ Quick Test Commands
+
+```powershell
+# Smoke test - kiểm tra nhanh
+pytest tests/test_utils.py tests/test_data/ -v --tb=short
+
+# Test imports
+python -c "from src.pipeline import Pipeline; from src.utils import ConfigLoader; print('OK')"
+
+# Test một function cụ thể
+pytest -k "test_batch_loader" -v
+```
 
 ---
 
@@ -975,7 +1071,7 @@ tuning:
 pytest -v -s
 
 # 2. Chạy test cụ thể bị fail
-pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data_removes_duplicates -v
+pytest tests/test_data/test_preprocessor.py -v
 
 # 3. Check dependencies
 pip install -r requirements.txt --upgrade
@@ -986,35 +1082,55 @@ pytest --cache-clear
 
 ---
 
-## 📈 Kết quả mẫu (Sample Results)
+## 🏗️ Kiến trúc Utilities (Utils Architecture)
 
-### Model Performance Comparison
-
-| Model | F1-Score | ROC-AUC | Precision | Recall | Training Time |
-|-------|----------|---------|-----------|--------|---------------|
-| XGBoost | **0.9123** | **0.9456** | 0.8945 | 0.9312 | 45.2s |
-| Random Forest | 0.8876 | 0.9234 | 0.8723 | 0.9034 | 32.1s |
-| Logistic Regression | 0.8234 | 0.8756 | 0.8012 | 0.8467 | 2.3s |
-| SVM | 0.8456 | 0.8923 | 0.8234 | 0.8689 | 78.5s |
-| Decision Tree | 0.7989 | 0.8234 | 0.7756 | 0.8234 | 1.8s |
-| AdaBoost | 0.8567 | 0.9012 | 0.8345 | 0.8801 | 28.4s |
-
-> 🏆 **Best Model:** XGBoost với F1-Score = 0.9123
-
-### Feature Importance (Top 10)
+### Phân chia trách nhiệm giữa Utils và DataOps
 
 ```
-1. DaySinceLastOrder        0.1823
-2. CashbackAmount           0.1456
-3. OrderCount               0.1234
-4. Tenure                   0.1123
-5. CouponUsed               0.0945
-6. ComplainStatus           0.0876
-7. OrderAmountHikeFromlastYear  0.0756
-8. WarehouseToHome          0.0645
-9. DaySinceLastOrder_Log    0.0534
-10. SatisfactionScore       0.0423
+┌─────────────────────────────────────────────────────────────┐
+│  UTILS (src/utils.py) - Stateless Utilities                │
+├─────────────────────────────────────────────────────────────┤
+│  File Operations:                                           │
+│    • IOHandler.read_data()      → Đọc 1 file               │
+│    • IOHandler.save_data()      → Lưu 1 file               │
+│    • IOHandler.save_model()     → Lưu model joblib         │
+│    • IOHandler.load_model()     → Load model               │
+│                                                             │
+│  File Discovery:                                            │
+│    • get_files_in_folder()      → List files theo ext      │
+│    • filter_files_by_date()     → Filter theo YYYY-MM      │
+│                                                             │
+│  Other Utilities:                                           │
+│    • ConfigLoader, Logger, ReportGenerator                 │
+│    • ensure_dir(), set_random_seed(), get_timestamp()      │
+│    • compute_file_hash(), get_latest_train_test()          │
+└─────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ sử dụng
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│  DATAOPS (src/ops/dataops.py) - Stateful Operations        │
+├─────────────────────────────────────────────────────────────┤
+│  BatchDataLoader:                                           │
+│    • Sử dụng get_files_in_folder() từ utils                │
+│    • Sử dụng IOHandler.read_data() từ utils                │
+│    • Thêm: tracking, deduplication, logging                │
+│                                                             │
+│  DataValidator:                                             │
+│    • validate_quality() → null/duplicate ratio             │
+│                                                             │
+│  DataVersioning:                                            │
+│    • Sử dụng compute_file_hash() từ utils                  │
+│    • Thêm: version history, lineage tracking               │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+### Nguyên tắc phân chia
+
+| Layer | Đặc điểm | Ví dụ |
+|-------|----------|-------|
+| **Utils** | Stateless, simple, reusable | `read_data()`, `get_files_in_folder()` |
+| **DataOps** | Stateful, tracking, business logic | `BatchDataLoader`, `DataVersioning` |
 
 ---
 
