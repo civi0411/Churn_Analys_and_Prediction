@@ -45,9 +45,9 @@ from .models import ModelTrainer
 from .visualization import EDAVisualizer, EvaluateVisualizer
 from .ops import (
     ExperimentTracker, ModelRegistry, DataValidator,
-    DataVersioning, ModelMonitor, ModelExplainer, BatchDataLoader
+    DataVersioning, ModelMonitor, ModelExplainer, ReportGenerator
 )
-from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timestamp, ensure_dir, Logger, ReportGenerator
+from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timestamp, ensure_dir, Logger
 
 
 class Pipeline:
@@ -97,7 +97,8 @@ class Pipeline:
         self.validator = DataValidator(logger)
         self.versioning = DataVersioning(config['dataops']['versions_dir'], logger)
         self.monitor = ModelMonitor(config['monitoring']['base_dir'])
-        self.report_generator = ReportGenerator(config['experiments']['base_dir'], logger)
+        # Construct ReportGenerator with named args to avoid argument-order mistakes
+        self.report_generator = ReportGenerator(experiments_base_dir=config['experiments']['base_dir'], logger=logger)
 
         # --- 2. SETUP CORE COMPONENTS ---
         # Data
@@ -124,28 +125,34 @@ class Pipeline:
         self.logger.info("STAGE: EXPLORATORY DATA ANALYSIS")
         self.logger.info("=" * 70)
 
-        # 1. Load Data (Support Batch Folder or Single File)
+        # 1. Load Data (Single file)
         raw_path = self.config['data']['raw_path']
-        batch_folder = self.config['data'].get('batch_folder')
-        batch_files = self.config['data'].get('batch_files')  # Filtered files từ CLI
-
-        if raw_path.lower() == 'full' and batch_folder:
-            # Sử dụng BatchDataLoader để nhất quán với run_preprocessing()
-            batch_loader = BatchDataLoader(batch_folder, self.logger)
-            df = batch_loader.load_all(deduplicate=True, file_list=batch_files)
-        else:
-            df = self.preprocessor.load_data(raw_path)
+        df = self.preprocessor.load_data(raw_path)
 
         self.logger.info(f"Raw Data Loaded | Rows: {df.shape[0]} | Columns: {df.shape[1]}")
 
         # 2. Visualization using EDAVisualizer
         # Cập nhật đường dẫn lưu nếu đang trong một Run
         if self.tracker.current_run_dir:
-            eda_dir = os.path.join(self.tracker.current_run_dir, 'figures', 'eda')
-            self.eda_viz = EDAVisualizer(self.config, self.logger, run_specific_dir=os.path.dirname(eda_dir))
+            # Pass the run's figures folder so EDA outputs to artifacts/experiments/<run_id>/figures/eda
+            run_figures_dir = os.path.join(self.tracker.current_run_dir, 'figures')
+            self.eda_viz = EDAVisualizer(self.config, self.logger, run_specific_dir=run_figures_dir)
 
         # Chạy Full EDA với tất cả plots cần thiết
         self.eda_viz.run_full_eda(df, self.target_col)
+
+        # Generate EDA markdown report that will embed the EDA figures under the run dir
+        try:
+            eda_report_path = self.report_generator.generate_eda_report(
+                df,
+                filename=f"eda_report_{self.tracker.current_run_id}",
+                target_col=self.target_col,
+                format='markdown',
+                run_id=self.tracker.current_run_id
+            )
+            self.logger.info(f"EDA Report written to: {eda_report_path}")
+        except Exception as e:
+            self.logger.warning(f"Failed to generate EDA report: {e}")
 
         self.logger.info(f"EDA Completed. Check {self.eda_viz.eda_dir}")
 
@@ -162,22 +169,10 @@ class Pipeline:
         self.logger.info("=" * 70)
 
         raw_path = self.config['data']['raw_path']
-        batch_folder = self.config['data'].get('batch_folder')
-        batch_files = self.config['data'].get('batch_files')  # Filtered files từ CLI
 
-        # 1. Load Data - Hỗ trợ batch loading (multiple files)
-        if raw_path.lower() == 'full' and batch_folder:
-            # Use BatchDataLoader cho incremental data
-            batch_loader = BatchDataLoader(batch_folder, self.logger)
-            df = batch_loader.load_all(deduplicate=True, file_list=batch_files)
-            source_path = batch_folder
-
-            if self.logger:
-                status = batch_loader.get_status()
-                self.logger.info(f"Batch Status  | Files: {status['total_files']} | Rows: {status['total_rows_loaded']:,}")
-        else:
-            df = self.preprocessor.load_data(raw_path)
-            source_path = raw_path
+        # 1. Load Data - Single file
+        df = self.preprocessor.load_data(raw_path)
+        source_path = raw_path
 
         # 2. DataOps: Version tracking for RAW data (với đầy đủ metadata)
         ver_id = self.versioning.create_version(
@@ -342,17 +337,6 @@ class Pipeline:
             else:
                 self.logger.info(f"Model Health: {health['status']}")
 
-            # Generate Training Report
-            feature_importance = self.trainer.get_feature_importance()
-            report_path = self.report_generator.generate_training_report(
-                run_id=self.tracker.current_run_id or get_timestamp(),
-                best_model_name=self.trainer.best_model_name,
-                all_metrics=metrics,
-                feature_importance=feature_importance,
-                config=self.config,
-                format='markdown'
-            )
-            self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
 
         return self.trainer, metrics
 
@@ -446,9 +430,10 @@ class Pipeline:
             config_snapshot_path = os.path.join(self.tracker.current_run_dir, "config_snapshot.yaml")
             IOHandler.save_yaml(self.config, config_snapshot_path)
 
-            # Redirect Logger to Run Folder
-            run_log_path = os.path.join(self.tracker.current_run_dir, "run.log")
-            # Gọi hàm helper get_logger để add thêm handler vào file log riêng này
+            # Redirect Logger to Run Folder. Name per-run log by selected mode (e.g., 'train.log', 'full.log')
+            run_log_filename = f"{mode.lower()}.log"
+            run_log_path = os.path.join(self.tracker.current_run_dir, run_log_filename)
+            # Add per-run handler (captures INFO+ for the run)
             Logger.get_logger('MAIN', run_log_path=run_log_path)
             self.logger.info("✓ Run-specific log initialized")
 
@@ -493,6 +478,24 @@ class Pipeline:
 
                 # Save Artifacts
                 self._save_training_artifacts(trainer)
+
+                # 2. Visualization (will create evaluation figures inside run dir)
+                self.run_visualization(trainer, metrics)
+
+                # Generate Training Report (embed evaluation figures)
+                try:
+                    feature_importance = trainer.get_feature_importance()
+                    report_path = self.report_generator.generate_training_report(
+                        run_id=self.tracker.current_run_id,
+                        best_model_name=trainer.best_model_name,
+                        all_metrics=metrics,
+                        feature_importance=feature_importance,
+                        config=self.config,
+                        format='markdown'
+                    )
+                    self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate training report: {e}")
 
                 # Log metrics
                 if trainer.best_model_name:
@@ -577,4 +580,3 @@ class Pipeline:
             self.logger.info(f"   {model_name}: {model_metrics}")
         self.logger.info("=" * 60)
         self.logger.info("[SUCCESS] Pipeline Finished.")
-

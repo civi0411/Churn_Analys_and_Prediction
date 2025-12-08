@@ -1,0 +1,179 @@
+"""
+src/ops/mlops/monitoring.py
+
+Model Monitor - Monitor performance and detect drift.
+"""
+import os
+import pandas as pd
+from typing import Dict, Any
+from datetime import datetime
+from ...utils import IOHandler, ensure_dir
+
+
+class ModelMonitor:
+    """Monitor model performance in production."""
+
+    def __init__(self, base_dir: str = "artifacts/monitoring"):
+        self.base_dir = base_dir
+        ensure_dir(base_dir)
+        self.performance_log = os.path.join(base_dir, "performance_log.csv")
+
+        if not os.path.exists(self.performance_log):
+            pd.DataFrame(columns=[
+                "timestamp", "model_name", "model_version",
+                "accuracy", "precision", "recall", "f1", "roc_auc",
+                "n_samples", "notes"
+            ]).to_csv(self.performance_log, index=False)
+
+    def log_performance(self, model_name: str, metrics: Dict[str, float],
+                        model_version: str = None, n_samples: int = None,
+                        notes: str = None):
+        """Log model performance."""
+        new_row = pd.DataFrame([{
+            "timestamp": datetime.now().isoformat(),
+            "model_name": model_name,
+            "model_version": model_version or "unknown",
+            "accuracy": metrics.get("accuracy"),
+            "precision": metrics.get("precision"),
+            "recall": metrics.get("recall"),
+            "f1": metrics.get("f1"),
+            "roc_auc": metrics.get("roc_auc"),
+            "n_samples": n_samples,
+            "notes": notes
+        }])
+
+        try:
+            if os.path.exists(self.performance_log):
+                df = pd.read_csv(self.performance_log)
+                if df.empty:
+                    df = new_row
+                else:
+                    df = pd.concat([df, new_row], ignore_index=True)
+            else:
+                df = new_row
+            df.to_csv(self.performance_log, index=False)
+        except Exception as e:
+            print(f"Error logging performance: {e}")
+
+    def get_performance_history(self, model_name: str = None) -> pd.DataFrame:
+        """Get performance history."""
+        if not os.path.exists(self.performance_log):
+            return pd.DataFrame()
+
+        df = pd.read_csv(self.performance_log)
+
+        if model_name:
+            df = df[df["model_name"] == model_name]
+
+        return df
+
+    def detect_drift(self, model_name: str, metric: str = "f1",
+                     threshold: float = 0.05) -> Dict:
+        """Detect performance drift."""
+        history = self.get_performance_history(model_name)
+
+        if len(history) < 2:
+            return {"drift_detected": False, "message": "Not enough data"}
+
+        baseline = history.iloc[0][metric]
+        current = history.iloc[-1][metric]
+
+        if pd.isna(baseline) or pd.isna(current):
+            return {"drift_detected": False, "message": "Missing metric values"}
+
+        drift = abs(current - baseline)
+        drift_detected = drift > threshold
+
+        return {
+            "drift_detected": drift_detected,
+            "baseline": float(baseline),
+            "current": float(current),
+            "drift": float(drift),
+            "threshold": threshold,
+            "message": f"Drift: {drift:.4f} ({'ALERT' if drift_detected else 'OK'})"
+        }
+
+    def create_alert(self, model_name: str, alert_type: str,
+                     message: str, severity: str = "WARNING") -> None:
+        """Create alert when issue detected."""
+        alerts_dir = os.path.join(self.base_dir, "alerts")
+        ensure_dir(alerts_dir)
+
+        alert = {
+            "timestamp": datetime.now().isoformat(),
+            "model_name": model_name,
+            "alert_type": alert_type,
+            "severity": severity,
+            "message": message
+        }
+
+        alert_file = os.path.join(
+            alerts_dir,
+            f"alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        IOHandler.save_json(alert, alert_file)
+
+        alerts_log = os.path.join(self.base_dir, "alerts_log.csv")
+        new_row = pd.DataFrame([alert])
+
+        try:
+            if os.path.exists(alerts_log):
+                df = pd.read_csv(alerts_log)
+                df = pd.concat([df, new_row], ignore_index=True)
+            else:
+                df = new_row
+            df.to_csv(alerts_log, index=False)
+        except Exception as e:
+            print(f"Error logging alert: {e}")
+
+    def check_health(self, model_name: str, current_metrics: Dict[str, float],
+                     baseline_metrics: Dict[str, float] = None,
+                     thresholds: Dict[str, float] = None) -> Dict:
+        """Check model health."""
+        if thresholds is None:
+            thresholds = {
+                "f1_min": 0.70,
+                "drift_max": 0.10,
+                "accuracy_min": 0.75
+            }
+
+        issues = []
+        recommendations = []
+        status = "HEALTHY"
+
+        for metric, threshold in thresholds.items():
+            if metric.endswith("_min"):
+                metric_name = metric.replace("_min", "")
+                if metric_name in current_metrics:
+                    if current_metrics[metric_name] < threshold:
+                        issues.append(
+                            f"{metric_name.upper()} below threshold: "
+                            f"{current_metrics[metric_name]:.3f} < {threshold}"
+                        )
+                        status = "WARNING"
+                        recommendations.append(
+                            "Consider retraining with more data or feature engineering"
+                        )
+
+        if baseline_metrics:
+            for metric in ["f1", "accuracy", "roc_auc"]:
+                if metric in current_metrics and metric in baseline_metrics:
+                    drift = abs(current_metrics[metric] - baseline_metrics[metric])
+                    if drift > thresholds.get("drift_max", 0.10):
+                        issues.append(f"{metric.upper()} drift detected: {drift:.3f}")
+                        status = "CRITICAL" if drift > 0.15 else "WARNING"
+                        recommendations.append("Model drift detected. Retrain recommended.")
+
+                        self.create_alert(
+                            model_name=model_name,
+                            alert_type="drift",
+                            message=f"{metric.upper()} drift: {drift:.3f}",
+                            severity="CRITICAL" if drift > 0.15 else "WARNING"
+                        )
+
+        return {
+            "status": status,
+            "issues": issues,
+            "recommendations": recommendations,
+            "timestamp": datetime.now().isoformat()
+        }

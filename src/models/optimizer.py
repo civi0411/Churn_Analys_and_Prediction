@@ -144,7 +144,19 @@ class ModelOptimizer:
             search_kwargs['param_grid'] = final_grid
         else:
             search_kwargs['param_distributions'] = final_grid
-            search_kwargs['n_iter'] = tuning_config.get('n_iter', 30)
+            # Cap n_iter to the total number of parameter combinations to avoid redundant sampling
+            requested_n_iter = int(tuning_config.get('n_iter', 30))
+            try:
+                # Estimate number of combinations
+                total_combinations = 1
+                for v in final_grid.values():
+                    total_combinations *= len(v) if hasattr(v, '__len__') else 1
+                if total_combinations == 0:
+                    total_combinations = requested_n_iter
+            except Exception:
+                total_combinations = requested_n_iter
+
+            search_kwargs['n_iter'] = min(requested_n_iter, max(1, total_combinations))
             search_kwargs['random_state'] = 42
 
         # 5. Execute Search

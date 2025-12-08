@@ -1,35 +1,41 @@
 """
 src/ops/__init__.py
 
-Operations Module - DataOps và MLOps.
+Operations Module - simplified public API.
 
-DataOps:
-    - DataValidator: Kiểm tra chất lượng data
-    - DataVersioning: Quản lý version data
-    - BatchDataLoader: Load nhiều files
+Exports:
+    - DataValidator, DataVersioning (DataOps)
+    - ExperimentTracker, ModelRegistry, ModelMonitor, ModelExplainer (MLOps)
+    - ReportGenerator (reporting)
 
-MLOps:
-    - ExperimentTracker: Track experiments
-    - ModelRegistry: Quản lý model versions
-    - ModelMonitor: Monitor performance
-    - ModelExplainer: SHAP explanations
+Note: Organizer CLI features removed for simplicity.
 """
-from .dataops import DataValidator, DataVersioning, BatchDataLoader
+# DataOps
+from .dataops import (
+    DataValidator,
+    DataVersioning,
+    # FileOrganizer
+)
+
+# MLOps
 from .mlops import (
     ExperimentTracker,
     ModelRegistry,
     ModelMonitor,
     ModelExplainer
 )
+# Reporting
+from .reporting import ReportGenerator
 
 __all__ = [
     # DataOps
     'DataValidator',
     'DataVersioning',
-    'BatchDataLoader',
     # MLOps
     'ExperimentTracker',
     'ModelRegistry',
     'ModelMonitor',
-    'ModelExplainer'
+    'ModelExplainer',
+    # Reporting
+    'ReportGenerator'
 ]

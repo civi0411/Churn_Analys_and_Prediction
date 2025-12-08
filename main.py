@@ -6,16 +6,13 @@ Usage:
     python main.py                                    # Full pipeline
     python main.py --mode eda                         # Chỉ chạy EDA
     python main.py --mode train --optimize            # Train với tuning
-    python main.py --data data/raw/new.csv            # File data khác
-    python main.py --batch data/raw/monthly           # Batch tất cả files
-    python main.py --batch data/raw/monthly --from 2024-01 --to 2024-06  # Batch theo thời gian
+    python main.py --data file.csv                    # File cụ thể
 """
 import argparse
 import sys
 import os
-from src.utils import ConfigLoader, Logger, set_random_seed, filter_files_by_date
+from src.utils import ConfigLoader, Logger, set_random_seed
 from src.pipeline import Pipeline
-
 
 
 def main():
@@ -25,9 +22,8 @@ def main():
     Workflow:
         1. Parse CLI arguments
         2. Load config và setup logger
-        3. Xử lý batch mode nếu có
-        4. Chạy Pipeline theo mode
-        5. Log kết quả
+        3. Chạy Pipeline theo mode
+        4. Log kết quả
 
     Returns:
         None. Exit code 0 nếu thành công, 1 nếu lỗi.
@@ -40,9 +36,11 @@ def main():
 Examples:
   python main.py                                      # Full pipeline
   python main.py --mode eda                           # EDA only
-  python main.py --batch data/raw/monthly             # Batch all files
-  python main.py --batch data/raw/monthly --from 2024-01 --to 2024-06
-  python main.py --batch data/raw/quarterly --from 2024-Q1 --to 2024-Q2
+  python main.py --mode train --optimize              # Train + tuning
+
+  # Data selection
+  python main.py --data path/to/file.csv              # Single file (absolute or relative to project)
+  python main.py --data data/raw/file.csv             # Relative to project
         """
     )
 
@@ -51,19 +49,10 @@ Examples:
                         help='Chế độ chạy pipeline (default: full)')
 
     parser.add_argument('--data', type=str, default=None,
-                        help="Đường dẫn file data (ghi đè config)")
-
-    parser.add_argument('--batch', type=str, default=None,
-                        help="Thư mục batch data (load nhiều files)")
-
-    parser.add_argument('--from', dest='from_date', type=str, default=None,
-                        help="Batch từ ngày (format: YYYY-MM hoặc YYYY-Q#)")
-
-    parser.add_argument('--to', dest='to_date', type=str, default=None,
-                        help="Batch đến ngày (format: YYYY-MM hoặc YYYY-Q#)")
+                        help="Đường dẫn file dữ liệu (absolute hoặc relative to project). Nếu không cung cấp sẽ dùng config")
 
     parser.add_argument('--model', type=str, default='all',
-                        help="Tên model cụ thể (vd: xgboost). Mặc định: all")
+                        help="Tên model cụ thể (default: all)")
 
     parser.add_argument('--optimize', action='store_true',
                         help="Bật hyperparameter tuning")
@@ -77,27 +66,21 @@ Examples:
     try:
         config = ConfigLoader.load_config(args.config)
 
+        # Handle --data: accept a single file path (absolute or relative to project root or data/)
         if args.data:
-            config['data']['raw_path'] = args.data
-
-        # Batch mode với filter thời gian
-        batch_files = None
-        if args.batch:
-            if not os.path.isdir(args.batch):
-                print(f"[ERROR] Batch folder not found: {args.batch}")
-                sys.exit(1)
-
-            batch_files = filter_files_by_date(args.batch, args.from_date, args.to_date)
-
-            if not batch_files:
-                print(f"[ERROR] No files found in {args.batch}")
-                if args.from_date or args.to_date:
-                    print(f"        Filter: from={args.from_date}, to={args.to_date}")
-                sys.exit(1)
-
-            config['data']['raw_path'] = 'full'
-            config['data']['batch_folder'] = args.batch
-            config['data']['batch_files'] = batch_files
+            # Absolute path
+            if os.path.isabs(args.data) and os.path.isfile(args.data):
+                config['data']['raw_path'] = args.data
+            else:
+                # Try relative to project data/ folder
+                rel = os.path.join('data', args.data)
+                if os.path.isfile(rel):
+                    config['data']['raw_path'] = rel
+                elif os.path.isfile(args.data):
+                    config['data']['raw_path'] = args.data
+                else:
+                    print(f"[ERROR] Data file not found: {args.data}")
+                    sys.exit(1)
 
         log_dir = config.get('artifacts', {}).get('logs_dir', 'artifacts/logs')
         log_level = config.get('logging', {}).get('level', 'INFO')
@@ -116,21 +99,8 @@ Examples:
     logger.info("=" * 60)
     logger.info(f"   Mode     : {args.mode.upper()}")
 
-    if args.batch:
-        logger.info(f"   Data     : BATCH MODE")
-        logger.info(f"   Folder   : {args.batch}")
-        if args.from_date or args.to_date:
-            logger.info(f"   Period   : {args.from_date or 'start'} -> {args.to_date or 'end'}")
-        logger.info(f"   Files    : {len(batch_files)}")
-        for f in batch_files[:5]:
-            logger.info(f"              - {os.path.basename(f)}")
-        if len(batch_files) > 5:
-            logger.info(f"              ... and {len(batch_files) - 5} more")
-    elif args.data:
-        logger.info(f"   Data     : {args.data}")
-    else:
-        logger.info(f"   Data     : From Config")
-
+    data_path = config['data'].get('raw_path')
+    logger.info(f"   Data     : {data_path}")
     logger.info(f"   Model    : {args.model.upper()}")
     logger.info(f"   Optimize : {args.optimize}")
     logger.info("=" * 60)

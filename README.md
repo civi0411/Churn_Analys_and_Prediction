@@ -279,7 +279,7 @@ graph TB
 │   │
 │   ├── 📂 ops/                          # ⚡ MODULE DATAOPS + MLOPS
 │   │   ├── 📄 __init__.py
-│   │   ├── 📄 dataops.py                # DataValidator, DataVersioning, BatchDataLoader
+│   │   ├── 📄 dataops.py                # DataValidator, DataVersioning
 │   │   └── 📄 mlops.py                  # ExperimentTracker, ModelRegistry, Monitor, Explainer
 │   │
 │   └── 📂 visualization/                # 📈 MODULE VISUALIZATION
@@ -386,7 +386,7 @@ graph TB
 | `src/data/transformer.py` | Feature engineering (stateful) | Học tham số từ train, apply cho test |
 | `src/utils.py` | Utilities: IOHandler, get_files_in_folder, filter_files_by_date | Đọc/ghi files, list/filter files |
 | `src/models/trainer.py` | Training logic | Train và evaluate models |
-| `src/ops/dataops.py` | DataOps: BatchDataLoader, DataValidator, DataVersioning | Load batch files, validate, version data |
+| `src/ops/dataops.py` | DataOps: DataValidator, DataVersioning | Load and version data |
 | `src/ops/mlops.py` | MLOps: ExperimentTracker, ModelRegistry, ModelMonitor | Tracking, registry, monitoring |
 | `artifacts/experiments/` | Lưu trữ từng run | Review lại experiments cũ |
 | `artifacts/model_registry/` | Models production-ready | Deploy model vào production |
@@ -406,7 +406,6 @@ data:
   date_col: "DaySinceLastOrder"                    # Cột ngày tháng (nếu có)
   raw_path: "data/raw/E Commerce Dataset.xlsx"     # Đường dẫn file input
   sheet_name: "E Comm"                             # Tên sheet Excel
-  batch_folder: "data/raw"                         # Thư mục chứa nhiều files (batch processing)
   test_size: 0.2                                   # Tỷ lệ test set (20%)
   random_state: 42                                 # Seed cho reproducibility
 ```
@@ -599,6 +598,7 @@ data:
 models:
   xgboost:
     n_estimators: [100, 200]  # Giảm để chạy nhanh hơn
+    max_depth: [3, 5]            # Thay vì [3, 5, 7]
 ```
 
 ---
@@ -759,7 +759,7 @@ python main.py --mode full --model xgboost
 
 ```powershell
 # 1. Khám phá dữ liệu mới
-python main.py --mode eda --data "data/raw/new_customers.xlsx"
+python main.py --mode eda --data "data/raw/your_data.xlsx"
 
 # 2. Train XGBoost với tuning cho production
 python main.py --mode full --model xgboost --optimize
@@ -798,12 +798,12 @@ tests/
 │   └── test_evaluator.py          # ModelEvaluator tests
 │
 ├── test_ops/
-│   ├── test_dataops.py            # DataValidator, DataVersioning, BatchDataLoader
+│   ├── test_dataops.py            # DataValidator, DataVersioning
 │   └── test_mlops.py              # ExperimentTracker, ModelRegistry, ModelMonitor
 │
-└── test_visualization/
-    ├── test_eda_plots.py          # EDAVisualizer tests
-    └── test_evaluate_plots.py     # EvaluateVisualizer tests
+├── test_visualization/
+│   ├── test_eda_plots.py          # EDAVisualizer tests
+│   └── test_evaluate_plots.py     # EvaluateVisualizer tests
 ```
 
 ### 🏃 Cách chạy Tests
@@ -828,7 +828,6 @@ pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_da
 
 # Chạy tests matching pattern
 pytest -k "transformer" -v                  # Tests có chứa "transformer"
-pytest -k "batch" -v                        # Tests liên quan đến batch loading
 
 # Stop khi fail đầu tiên
 pytest -x
@@ -897,10 +896,6 @@ test_validator_duplicate_ratio           # Tính duplicate ratio
 test_versioning_create_version           # Tạo version mới
 test_versioning_hash_based               # Hash-based versioning
 test_versioning_add_lineage              # Track data lineage
-test_batch_loader_load_all               # Load tất cả files
-test_batch_loader_uses_utils             # Sử dụng get_files_in_folder từ utils
-test_batch_loader_deduplication          # Loại bỏ duplicates
-test_batch_loader_tracking               # Track files đã load
 ```
 
 #### `test_ops/test_mlops.py` - MLOps
@@ -928,12 +923,11 @@ pytest tests/test_utils.py tests/test_data/ -v --tb=short
 python -c "from src.pipeline import Pipeline; from src.utils import ConfigLoader; print('OK')"
 
 # Test một function cụ thể
-pytest -k "test_batch_loader" -v
 ```
 
 ---
 
-## 🔄 Workflow thực tế (Real-world Workflow)
+## 🚀 Workflow thực tế (Real-world Workflow)
 
 ### Scenario 1: Khám phá dữ liệu mới
 
@@ -994,7 +988,7 @@ python main.py --mode train --model all --optimize
 # Review artifacts/monitoring/performance_log.csv
 
 # 2. Nếu phát hiện drift, retrain với data mới
-python main.py --mode full --model xgboost --optimize --data "data/raw/new_batch.xlsx"
+python main.py --mode full --model xgboost --optimize --data "data/raw/new_data.xlsx"
 
 # 3. Compare metrics với version cũ
 # So sánh registry.json và performance_log.csv
@@ -1111,11 +1105,6 @@ pytest --cache-clear
 ┌─────────────────────────────────────────────────────────────┐
 │  DATAOPS (src/ops/dataops.py) - Stateful Operations        │
 ├─────────────────────────────────────────────────────────────┤
-│  BatchDataLoader:                                           │
-│    • Sử dụng get_files_in_folder() từ utils                │
-│    • Sử dụng IOHandler.read_data() từ utils                │
-│    • Thêm: tracking, deduplication, logging                │
-│                                                             │
 │  DataValidator:                                             │
 │    • validate_quality() → null/duplicate ratio             │
 │                                                             │
@@ -1128,9 +1117,9 @@ pytest --cache-clear
 ### Nguyên tắc phân chia
 
 | Layer | Đặc điểm | Ví dụ |
-|-------|----------|-------|
+|-------|----------|-------------|
 | **Utils** | Stateless, simple, reusable | `read_data()`, `get_files_in_folder()` |
-| **DataOps** | Stateful, tracking, business logic | `BatchDataLoader`, `DataVersioning` |
+| **DataOps** | Stateful, tracking, business logic | `DataValidator`, `DataVersioning` |
 
 ---
 
@@ -1171,4 +1160,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <b>Made with ❤️ by <a href="https://github.com/civi0411">civi0411</a></b><br>
   <i>Data Science • Machine Learning • MLOps</i>
 </p>
-

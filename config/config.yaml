@@ -5,10 +5,12 @@ data:
   target_col: "Churn"
   date_col: "DaySinceLastOrder"
 
+  # Base directory cho data folders
+  base_dir: "data"
+
   # Source data (Đảm bảo file Excel nằm đúng đường dẫn này)
   raw_path: "data/raw/E Commerce Dataset.xlsx"
   sheet_name: "E Comm"
-  batch_folder: "data/raw"
 
   # Output directories
   processed_dir: "data/processed"

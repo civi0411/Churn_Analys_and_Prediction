@@ -309,7 +309,7 @@ class ModelTrainer:
         """
         Train tất cả models được định nghĩa trong config.
 
-        Batch training với logging chi tiết.
+        Training loop over configured models with detailed logging.
 
         Args:
             optimize (bool): True để tuning hyperparameters, False cho baseline
@@ -334,7 +334,7 @@ class ModelTrainer:
         if self.logger:
             sampler_name = type(sampler).__name__ if sampler else 'None'
             self.logger.info("=" * 70)
-            self.logger.info(f"BATCH TRAINING | Models: {len(model_names)} | Optimize: {optimize} | Sampler: {sampler_name}")
+            self.logger.info(f"TRAINING RUN | Models: {len(model_names)} | Optimize: {optimize} | Sampler: {sampler_name}")
             self.logger.info("=" * 70)
 
         all_metrics = {}
@@ -510,3 +510,4 @@ class ModelTrainer:
         IOHandler.save_json(results_json, file_path)
         if self.logger: self.logger.info(f"Results Saved | {file_path}")
         return file_path
+

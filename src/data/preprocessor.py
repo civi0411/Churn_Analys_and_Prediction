@@ -157,6 +157,19 @@ class DataPreprocessor:
                 'Cash on Delivery': 'COD'
             })
 
+        # 5. Coerce numeric-like strings to numeric (handle cases like "[5E-1]", " 0.5 ")
+        # This helps downstream components (models, SHAP) that expect numeric inputs.
+        for col in df.select_dtypes(include=['object', 'string']).columns:
+            try:
+                # Strip whitespace and surrounding brackets/parentheses
+                converted = pd.to_numeric(df[col].astype(str).str.strip().str.strip('[]()'), errors='coerce')
+                # If conversion produced at least one numeric value, apply where notna
+                if converted.notna().sum() > 0:
+                    df.loc[converted.notna(), col] = converted[converted.notna()]
+            except Exception:
+                # Leave column unchanged on any unexpected error
+                continue
+
         if self.logger:
             self.logger.info("Data cleaning completed")
 
