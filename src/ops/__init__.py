@@ -25,7 +25,7 @@ from .mlops import (
     ModelExplainer
 )
 # Reporting
-from .reporting import ReportGenerator
+from .report import ReportGenerator
 
 __all__ = [
     # DataOps

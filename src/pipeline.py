@@ -460,6 +460,9 @@ class Pipeline:
             'test_size': self.config['data']['test_size']
         })
 
+        # Report format: Markdown-first (hard-coded)
+        report_format = 'markdown'
+
         try:
             # ========== MODE: EDA ==========
             if mode == 'eda':
@@ -511,7 +514,7 @@ class Pipeline:
                         format='markdown',
                         mode=mode,
                         optimize=optimize,
-                        args=getattr(self, '_cli_args', None)  # Pass CLI args if available
+                        args=None
                     )
                     self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
                 except Exception as e:
@@ -577,7 +580,7 @@ class Pipeline:
                         format='markdown',
                         mode=mode,
                         optimize=optimize,
-                        args=getattr(self, '_cli_args', None),
+                        args=None,
                         eda_summary=eda_summary
                     )
                     self.logger.info(f"Report Generated | {os.path.basename(report_path)}")

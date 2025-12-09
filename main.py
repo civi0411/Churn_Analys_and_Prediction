@@ -60,6 +60,8 @@ Examples:
     parser.add_argument('--config', type=str, default='config/config.yaml',
                         help="Đường dẫn file config")
 
+    # Note: reports are Markdown-first. PDF export is optional and not enabled by default in this repo.
+
     args = parser.parse_args()
 
     # 2. Khởi tạo Config và Logger
@@ -108,8 +110,6 @@ Examples:
     # 3. Chạy Pipeline
     try:
         pipeline = Pipeline(config, logger)
-        # Store CLI args in pipeline for report generator
-        pipeline._cli_args = args
 
         result = pipeline.run(
             mode=args.mode,
