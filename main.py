@@ -108,6 +108,8 @@ Examples:
     # 3. Chạy Pipeline
     try:
         pipeline = Pipeline(config, logger)
+        # Store CLI args in pipeline for report generator
+        pipeline._cli_args = args
 
         result = pipeline.run(
             mode=args.mode,

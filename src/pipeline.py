@@ -117,9 +117,10 @@ class Pipeline:
     # =========================================================================
     # STAGE 1: EXPLORATORY DATA ANALYSIS (EDA)
     # =========================================================================
-    def run_eda(self) -> None:
+    def run_eda(self) -> dict:
         """
         Exploratory Data Analysis trên raw data
+        Returns EDA summary for reporting.
         """
         self.logger.info("\n" + "=" * 70)
         self.logger.info("STAGE: EXPLORATORY DATA ANALYSIS")
@@ -132,13 +133,10 @@ class Pipeline:
         self.logger.info(f"Raw Data Loaded | Rows: {df.shape[0]} | Columns: {df.shape[1]}")
 
         # 2. Visualization using EDAVisualizer
-        # Cập nhật đường dẫn lưu nếu đang trong một Run
         if self.tracker.current_run_dir:
-            # Pass the run's figures folder so EDA outputs to artifacts/experiments/<run_id>/figures/eda
             run_figures_dir = os.path.join(self.tracker.current_run_dir, 'figures')
             self.eda_viz = EDAVisualizer(self.config, self.logger, run_specific_dir=run_figures_dir)
 
-        # Chạy Full EDA với tất cả plots cần thiết
         self.eda_viz.run_full_eda(df, self.target_col)
 
         # Generate EDA markdown report that will embed the EDA figures under the run dir
@@ -155,6 +153,25 @@ class Pipeline:
             self.logger.warning(f"Failed to generate EDA report: {e}")
 
         self.logger.info(f"EDA Completed. Check {self.eda_viz.eda_dir}")
+
+        # Build EDA summary for reporting
+        summary = {}
+        if self.target_col in df.columns:
+            churn_rate = df[self.target_col].value_counts(normalize=True).get(1, 0)
+            summary['churn_rate'] = churn_rate
+        summary['missing'] = int(df.isnull().sum().sum())
+        summary['n_rows'] = df.shape[0]
+        summary['n_cols'] = df.shape[1]
+        summary['duplicate'] = int(df.duplicated().sum())
+        # Top correlated features (if correlation matrix available)
+        try:
+            corr = df.corr()[self.target_col].abs().sort_values(ascending=False)
+            top_corr = [c for c in corr.index if c != self.target_col][:3]
+            summary['top_correlated'] = top_corr
+        except Exception:
+            summary['top_correlated'] = []
+        summary['resampling'] = 'Đã áp dụng SMOTE/Tomek để cân bằng lại tập huấn luyện.'
+        return summary
 
     # =========================================================================
     # STAGE 2: PREPROCESSING (Clean -> Split -> Transform)
@@ -491,7 +508,10 @@ class Pipeline:
                         all_metrics=metrics,
                         feature_importance=feature_importance,
                         config=self.config,
-                        format='markdown'
+                        format='markdown',
+                        mode=mode,
+                        optimize=optimize,
+                        args=getattr(self, '_cli_args', None)  # Pass CLI args if available
                     )
                     self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
                 except Exception as e:
@@ -521,7 +541,7 @@ class Pipeline:
 
             # ========== MODE: FULL ==========
             elif mode == 'full':
-                self.run_eda()
+                eda_summary = self.run_eda()
 
                 # 1. Preprocess
                 processed_path, train_path, test_path = self.run_preprocessing()
@@ -544,6 +564,25 @@ class Pipeline:
 
                 # 5. Final Summary
                 self._log_training_summary(trainer, metrics)
+
+                # 6. Generate full report (EDA + Training)
+                try:
+                    feature_importance = trainer.get_feature_importance()
+                    report_path = self.report_generator.generate_training_report(
+                        run_id=self.tracker.current_run_id,
+                        best_model_name=trainer.best_model_name,
+                        all_metrics=metrics,
+                        feature_importance=feature_importance,
+                        config=self.config,
+                        format='markdown',
+                        mode=mode,
+                        optimize=optimize,
+                        args=getattr(self, '_cli_args', None),
+                        eda_summary=eda_summary
+                    )
+                    self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
+                except Exception as e:
+                    self.logger.warning(f"Failed to generate training report: {e}")
 
                 self.tracker.end_run("FINISHED")
                 return trainer, metrics
