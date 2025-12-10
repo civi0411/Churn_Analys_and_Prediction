@@ -6,6 +6,8 @@ Data Validator - Check data quality.
 import pandas as pd
 import re
 from typing import Dict, Any
+import os
+from ...utils import IOHandler, ensure_dir
 
 
 class DataValidator:
@@ -168,3 +170,21 @@ class DataValidator:
 
         return report
 
+    def persist_business_report(self, report: Dict[str, Any], run_dir: str) -> Optional[str]:
+        """
+        Persist the business rules report JSON under run_dir/data/business_rules_report.json
+        Returns the path saved or None on failure.
+        """
+        if not run_dir:
+            return None
+        try:
+            ensure_dir(os.path.join(run_dir, 'data'))
+            path = os.path.join(run_dir, 'data', 'business_rules_report.json')
+            IOHandler.save_json(report, path)
+            if self.logger:
+                self.logger.info(f"Business rules report saved: {path}")
+            return path
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Failed to persist business rules report: {e}")
+            return None

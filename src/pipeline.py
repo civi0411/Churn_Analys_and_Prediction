@@ -46,9 +46,11 @@ from .data import DataPreprocessor, DataTransformer
 from .models import ModelTrainer
 from .visualization import EDAVisualizer, EvaluateVisualizer
 from .ops import (
-    ExperimentTracker, ModelRegistry, DataValidator,
+    ExperimentTracker, ModelRegistry,
     DataVersioning, ModelMonitor, ModelExplainer, ReportGenerator
 )
+from .ops.dataops.validator import DataValidator
+from .ops.dataops.drift_detector import DataDriftDetector
 from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timestamp, ensure_dir, Logger
 
 
@@ -726,10 +728,26 @@ class Pipeline:
         df_new = self.preprocessor.load_data(input_path)
         self.logger.info(f"Loaded new data: {df_new.shape}")
 
-        # 2. Business validation
+        # 2. Business validation (use DataQualityService)
         validation_result = self.validator.validate_quality(df_new)
         if validation_result.get('null_ratio', 0) > 0.3:
-            self.logger.warning("⚠️  High null ratio detected. Proceed with caution.")
+            self.logger.warning("High null ratio detected. Proceed with caution.")
+
+        try:
+            br_conf = self.config.get('dataops', {}).get('business_rules', {})
+            br_report = self.validator.validate_business_rules(df_new)
+            # persist if configured
+            if br_conf.get('persist', True) and self.tracker.current_run_dir:
+                try:
+                    self.validator.persist_business_report(br_report, self.tracker.current_run_dir)
+                except Exception as e:
+                    self.logger.warning(f"Failed to persist business rules report: {e}")
+            # abort if configured
+            if not br_report.get('passed', True) and br_conf.get('fail_on_violation', False):
+                self.logger.error("Business rules violations detected and 'fail_on_violation' is True. Aborting prediction.")
+                return None
+        except Exception as e:
+            self.logger.warning(f"Business rules validation failed: {e}")
 
         # 3. Load reference data (training data)
         train_test_dir = self.config['data']['train_test_dir']
@@ -739,20 +757,24 @@ class Pipeline:
         # Remove target if present
         df_train_raw = df_train.drop(columns=[self.target_col], errors='ignore')
 
-        # 4. Drift Detection
-        from src.ops.dataops.drift_detector import DataDriftDetector
-
-        drift_detector = DataDriftDetector(df_train_raw, self.logger)
-        drift_report = drift_detector.detect_drift(df_new, threshold=drift_threshold)
-
-        # Persist drift report for audit
+        # 4. Drift Detection (use DriftService)
         try:
-            drift_report_path = os.path.join('artifacts', 'drift_reports', f'drift_{get_timestamp()}.json')
-            ensure_dir(os.path.dirname(drift_report_path))
-            IOHandler.save_json(drift_report, drift_report_path)
-            self.logger.info(f"Drift report saved: {drift_report_path}")
-        except Exception:
-            self.logger.warning("Failed to persist drift report")
+            drift_conf = self.config.get('dataops', {}).get('drift_detection', {})
+            reports_dir = self.config.get('dataops', {}).get('drift_reports_dir', None)
+            if not reports_dir:
+                reports_dir = os.path.join('artifacts', 'reports', 'drift')
+
+            detector = DataDriftDetector(df_train_raw, self.logger)
+            drift_report = detector.detect_drift(df_new, threshold=drift_conf.get('pvalue_threshold', drift_threshold), sample_frac=drift_conf.get('sample_frac', 1.0), max_rows=drift_conf.get('max_rows', None))
+            try:
+                drift_json_path, drift_md_path = detector.save_report(drift_report, reports_dir)
+                drift_report_path = drift_json_path
+            except Exception:
+                drift_report_path = None
+        except Exception as e:
+            self.logger.warning(f"Drift detection failed: {e}")
+            drift_report = {'summary': {'drift_severity': 'NONE', 'total_features_checked': 0, 'drifted_features': 0}, 'drift_details': {}}
+            drift_report_path = None
 
         # 5. Decision: Predict or Alert
         drift_severity = drift_report['summary']['drift_severity']
@@ -762,7 +784,7 @@ class Pipeline:
         drift_ratio = (drifted_count / total_checked) if total_checked > 0 else 0
 
         if drift_severity == 'CRITICAL' or drift_ratio > max_drift_ratio:
-             self.logger.error("🚨 CRITICAL DRIFT - Prediction aborted!")
+             self.logger.error("CRITICAL DRIFT - Prediction aborted!")
              self.logger.error("Recommendation: Retrain model with new data")
 
              # Save drift report
@@ -770,7 +792,7 @@ class Pipeline:
              return None
 
         elif drift_severity in ['MODERATE', 'LOW']:
-            self.logger.warning(f"⚠️  {drift_severity} drift detected. Proceeding with prediction...")
+            self.logger.warning(f"⚠ {drift_severity} drift detected. Proceeding with prediction...")
             self.logger.warning("Consider retraining soon for better accuracy")
 
         # 6. Proceed with prediction if requested

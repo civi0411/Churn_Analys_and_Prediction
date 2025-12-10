@@ -1,42 +1,42 @@
-# 🔄 Customer Churn Analysis & Prediction
+# Customer Churn Analysis & Prediction
 
 ![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-orange.svg)
 ![XGBoost](https://img.shields.io/badge/XGBoost-2.0+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## 📋 Tổng quan (Overview)
+## Overview
 
-Dự án này không chỉ là một bài toán phân loại Machine Learning thông thường. Đây là một hệ thống **Software Engineering for Data Science** hoàn chỉnh, giải quyết bài toán dự đoán khách hàng rời bỏ (Customer Churn) cho lĩnh vực Thương mại điện tử (E-Commerce).
+Dự án này không chỉ là một bài toán phân loại Machine Learning thông thường. Đây là một hệ thống Software Engineering for Data Science hoàn chỉnh, giải quyết bài toán dự đoán khách hàng rời bỏ (Customer Churn) cho lĩnh vực Thương mại điện tử (E-Commerce).
 
-> 💡 **Khác biệt chính**: Thay vì chạy code trên Jupyter Notebook rời rạc, hệ thống này được xây dựng thành một **Pipeline khép kín**, có khả năng tái sử dụng (reproducible), dễ dàng mở rộng (scalable) và tích hợp sẵn quy trình **MLOps tự xây dựng** (Custom MLOps).
+> Khác biệt chính: Thay vì chạy code trên Jupyter Notebook rời rạc, hệ thống này được xây dựng thành một Pipeline khép kín, có khả năng tái sử dụng (reproducible), dễ dàng mở rộng (scalable) và tích hợp sẵn quy trình MLOps tự xây dựng (Custom MLOps).
 
-### 💼 Giá Trị Kinh Doanh (Business Value)
+### Business Value
 
 | Giá trị | Mô tả |
 |---------|-------|
-| 🎯 **Sàng lọc sớm** | Nhận diện khách hàng có nguy cơ rời bỏ với độ chính xác cao (F1-Score > 0.85) |
-| 🔍 **Hiểu hành vi** | Sử dụng SHAP để giải thích lý do khách hàng rời bỏ (VD: Do thời gian giao hàng, hay do ít nhận được ưu đãi) |
-| 💰 **Tối ưu chi phí** | Giúp bộ phận Marketing khoanh vùng đúng đối tượng để gửi voucher giữ chân, tránh lãng phí ngân sách |
-| 📦 **Quản trị mô hình** | Version tracking cho dữ liệu, model registry, monitoring và health check tự động |
+| Screening | Nhận diện khách hàng có nguy cơ rời bỏ với độ chính xác cao (F1-Score > 0.85) |
+| Behavior Insights | Sử dụng SHAP để giải thích lý do khách hàng rời bỏ |
+| Cost Optimization | Giúp bộ phận Marketing khoanh vùng đúng đối tượng để gửi voucher giữ chân |
+| Model Governance | Version tracking cho dữ liệu, model registry, monitoring và health check tự động |
 
-### 🎓 Đặc điểm kỹ thuật nổi bật
+### Key Technical Features
 
-- ✅ **Modular Architecture**: Tách biệt rõ ràng giữa Data, Model, Ops, Visualization
-- ✅ **Data Leakage Prevention**: Fit trên Train, Transform trên Test - tuân thủ nghiêm ngặt
-- ✅ **Multiple Models Support**: LogisticRegression, SVM, DecisionTree, RandomForest, XGBoost, AdaBoost
-- ✅ **Automated Hyperparameter Tuning**: RandomizedSearchCV với cross-validation
-- ✅ **Imbalanced Data Handling**: SMOTE + Tomek Links để cân bằng lớp Churn
-- ✅ **Experiment Tracking**: Lưu trữ từng run với snapshot config, metrics, models
-- ✅ **Model Registry**: Quản lý phiên bản model production-ready
-- ✅ **Performance Monitoring**: Health check tự động, drift detection
-- ✅ **Explainability**: SHAP values để giải thích quyết định của model
+- Modular Architecture: Tách biệt rõ ràng giữa Data, Model, Ops, Visualization
+- Data Leakage Prevention: Fit trên Train, Transform trên Test - tuân thủ nghiêm ngặt
+- Multiple Models Support: LogisticRegression, SVM, DecisionTree, RandomForest, XGBoost, AdaBoost
+- Automated Hyperparameter Tuning: RandomizedSearchCV với cross-validation
+- Imbalanced Data Handling: SMOTE + Tomek Links để cân bằng lớp Churn
+- Experiment Tracking: Lưu trữ từng run với snapshot config, metrics, models
+- Model Registry: Quản lý phiên bản model production-ready
+- Performance Monitoring: Health check tự động, drift detection
+- Explainability: SHAP values để giải thích quyết định của model
 
 ---
 
-## 🏗️ Kiến trúc hệ thống (System Architecture)
+## System Architecture
 
-### 📊 Pipeline Flow - Luồng xử lý End-to-End
+### Pipeline Flow - Luồng xử lý End-to-End
 
 ```mermaid
 %%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#e3f2fd','primaryTextColor':'#1565c0','primaryBorderColor':'#1976d2','lineColor':'#42a5f5','secondaryColor':'#fff3e0','tertiaryColor':'#e8f5e9'}}}%%
@@ -138,7 +138,7 @@ flowchart TB
     class S6 stage6
 ```
 
-### 🔐 Nguyên tắc chống Data Leakage
+### Nguyên tắc chống Data Leakage
 
 > ⚠️ **QUAN TRỌNG**: Mọi thông tin thống kê (mean, std, IQR bounds, encoding mappings...) chỉ được học từ **Train Set**. Test Set chỉ được **Transform** với tham số đã học - **KHÔNG BAO GIỜ FIT LẠI!**
 
@@ -176,7 +176,7 @@ flowchart LR
     class WARNING warnStyle
 ```
 
-### 🧩 Kiến trúc module (Module Architecture)
+### Kiến trúc module (Module Architecture)
 
 ```mermaid
 %%{init: {'theme':'base', 'themeVariables': { 'fontSize':'14px'}}}%%
@@ -376,7 +376,7 @@ graph TB
         └── 📄 sample_processed.csv      # Processed data mẫu
 ```
 
-### 📋 Giải thích các thành phần quan trọng
+### Giải thích các thành phần quan trọng
 
 | Thư mục/File | Mục đích | Khi nào cần |
 |--------------|----------|-------------|
@@ -755,7 +755,7 @@ python main.py --mode full --model xgboost
 | `--data` | Đường dẫn data (override config) | `None` | `--data data/raw/new_data.xlsx` |
 | `--config` | Đường dẫn config file | `config/config.yaml` | `--config config/custom.yaml` |
 
-### 📝 Ví dụ thực tế
+### Ví dụ thực tế
 
 ```powershell
 # 1. Khám phá dữ liệu mới
@@ -965,6 +965,3 @@ python main.py --mode predict --data "data/raw/new_customers.csv"
 
 # Kết quả sẽ nằm ở: artifacts/predictions/customer_batch_2025_predicted.csv
 ```
-
----
-

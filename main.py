@@ -118,20 +118,8 @@ Examples:
         pipeline = Pipeline(config, logger)
 
         if args.mode == 'predict':
-            # Run quick drift check as a WARNING (do not abort prediction)
+            # Run prediction only (no drift pre-check)
             input_path = args.data or config['data'].get('raw_path')
-            try:
-                df_new = IOHandler.read_data(input_path)
-                # run drift check which will persist reports; do not abort on critical here
-                report, report_path = pipeline.run_drift_check(df_new, threshold=args.drift_threshold)
-                severity = report['summary'].get('drift_severity')
-                if severity in ['MODERATE', 'LOW', 'CRITICAL']:
-                    logger.warning(f"Drift detected (severity={severity}). See report: {report_path}")
-            except Exception as e:
-                logger.warning(f"Drift pre-check failed: {e}")
-            # Proceed to prediction
-            # Cho phép truyền input/model/output qua --data/--model nếu cần
-            input_path = config['data'].get('raw_path')
             model_path = None
             output_path = None
             pred_path = pipeline.run(

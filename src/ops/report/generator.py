@@ -97,7 +97,7 @@ class ReportGenerator:
         lines = []
 
         # === HEADER ===
-        lines.append(f"# 🚀 ML Pipeline Report - Run {sanitize_text(run_id)}")
+        lines.append(f"# ML Pipeline Report - Run {sanitize_text(run_id)}")
         lines.append("")
         lines.append(f"**Generated:** {timestamp}")
         lines.append("")
@@ -105,7 +105,7 @@ class ReportGenerator:
         lines.append("")
 
         # === RUN INFORMATION ===
-        lines.append("## 📋 Run Information")
+        lines.append("## Run Information")
         lines.append("")
         lines.append("| Parameter | Value |")
         lines.append("|:----------|:------|")
@@ -133,9 +133,9 @@ class ReportGenerator:
 
         # === PREPROCESSING SECTION ===
         if mode == 'preprocess':
-            lines.append("## 🔧 Data Preprocessing")
+            lines.append("## Data Preprocessing")
             lines.append("")
-            lines.append("✅ Data preprocessing completed successfully.")
+            lines.append("Data preprocessing completed successfully.")
             lines.append("")
             lines.append("**Steps performed:**")
             lines.append("1. Data loading and validation")
@@ -168,11 +168,11 @@ class ReportGenerator:
         """Generate EDA section with visualizations."""
         lines = []
 
-        lines.append("## 🔍 Exploratory Data Analysis")
+        lines.append("## Exploratory Data Analysis")
         lines.append("")
 
         # Statistics
-        lines.append("### 📊 Dataset Statistics")
+        lines.append("### Dataset Statistics")
         lines.append("")
         lines.append("| Metric | Value |")
         lines.append("|:-------|:------|")
@@ -193,7 +193,7 @@ class ReportGenerator:
 
         # Key Insights
         if 'top_correlated' in eda_summary and eda_summary['top_correlated']:
-            lines.append("### 💡 Key Insights")
+            lines.append("### Key Insights")
             lines.append("")
             top_features = eda_summary['top_correlated'][:3]
             lines.append(f"**Top correlated features with target:** {', '.join(top_features)}")
@@ -202,7 +202,7 @@ class ReportGenerator:
         # Visualizations
         eda_fig_dir = os.path.join(run_dir, 'figures', 'eda')
         if os.path.isdir(eda_fig_dir):
-            lines.append("### 📈 Visualizations")
+            lines.append("### Visualizations")
             lines.append("")
 
             for fname in sorted(os.listdir(eda_fig_dir)):
