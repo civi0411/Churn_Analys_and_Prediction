@@ -38,8 +38,7 @@ Author: Churn Prediction Team
 import os
 import shutil
 import logging
-import pandas as pd
-from typing import Dict, Any, Tuple, Optional, Any
+from typing import Dict, Any, Tuple
 
 # --- NEW MODULAR IMPORTS ---
 from .data import DataPreprocessor, DataTransformer
@@ -523,15 +522,12 @@ class Pipeline:
             # ========== MODE: PREPROCESS ==========
             elif mode == 'preprocess':
                 processed_path, train_path, test_path = self.run_preprocessing()
-
-                # Copy Artifacts to Run Dir
                 if self.tracker.current_run_dir:
                     data_dir = os.path.join(self.tracker.current_run_dir, 'data')
                     ensure_dir(data_dir)
                     shutil.copy2(processed_path, os.path.join(data_dir, os.path.basename(processed_path)))
                     shutil.copy2(train_path, os.path.join(data_dir, os.path.basename(train_path)))
                     shutil.copy2(test_path, os.path.join(data_dir, os.path.basename(test_path)))
-
                 self._generate_report_for_run(mode, optimize=False)
                 self.tracker.end_run("FINISHED")
                 return processed_path, train_path, test_path
@@ -541,25 +537,14 @@ class Pipeline:
                 train_test_dir = self.config['data']['train_test_dir']
                 raw_filename = self.config['data']['raw_path']
                 train_path, test_path = get_latest_train_test(train_test_dir, raw_filename)
-
                 self.logger.info(f"Using Train | {train_path}")
                 self.logger.info(f"Using Test  | {test_path}")
-
                 trainer, metrics = self.run_training(train_path, test_path, model_name, optimize)
-
-                # Save Artifacts
                 self._save_training_artifacts(trainer)
-
-                # Visualization
                 self.run_visualization(trainer, metrics)
-
-                # Generate Report
                 self._generate_report_for_run(mode, optimize, trainer, metrics)
-
-                # Log metrics
                 if trainer.best_model_name:
                     self.tracker.log_metrics(metrics[trainer.best_model_name])
-
                 self.tracker.end_run("FINISHED")
                 return trainer, metrics
 
@@ -568,11 +553,9 @@ class Pipeline:
                 train_test_dir = self.config['data']['train_test_dir']
                 raw_filename = self.config['data']['raw_path']
                 train_path, test_path = get_latest_train_test(train_test_dir, raw_filename)
-
                 self.logger.info("Visualize mode: Running quick training (no-opt)...")
                 trainer, metrics = self.run_training(train_path, test_path, model_name, optimize=False)
                 self.run_visualization(trainer, metrics)
-
                 self._save_training_artifacts(trainer)
                 self._generate_report_for_run(mode, False, trainer, metrics)
                 self.tracker.end_run("FINISHED")
@@ -648,54 +631,75 @@ class Pipeline:
             self.logger.info(f"Best Model: {trainer.best_model_name}")
             self.logger.info(f"Metrics: {metrics.get(trainer.best_model_name, {})}")
 
-    def run_predict(self, input_path: str = None, model_path: str = None, output_path: str = None) -> str:
+    def run_predict(self, input_path: str = None,
+                    model_path: str = None,
+                    output_path: str = None,
+                    check_drift: bool = True,  # ← NEW
+                    drift_threshold: float = 0.05,  # ← NEW
+                    abort_on_critical: bool = True  # ← NEW
+                    ) -> str:
         """
-        Dự đoán trên dữ liệu mới với model đã huấn luyện.
-        Args:
-            input_path (str): Đường dẫn file dữ liệu đầu vào (csv/xlsx/parquet)
-            model_path (str): Đường dẫn model đã train (.joblib)
-            output_path (str): Đường dẫn file lưu kết quả dự đoán (csv)
-        Returns:
-            str: Đường dẫn file kết quả dự đoán
+        Predict with optional drift detection.
         """
-        # no local pandas import needed; preprocessor will handle file reading
-        self.logger.info("\n" + "=" * 70)
-        self.logger.info("STAGE: PREDICT (INFERENCE)")
         self.logger.info("=" * 70)
+        self.logger.info("STAGE: PREDICT")
 
-        if input_path is None:
-            input_path = self.config['data']['raw_path']
-        if model_path is None:
-            # Lấy model mới nhất từ registry
-            reg = self.registry
-            model_path = reg.get_latest_model_path() if hasattr(reg, 'get_latest_model_path') else None
-            if not model_path:
-                # fallback: lấy file model mới nhất trong registry dir
-                reg_dir = self.config['mlops']['registry_dir']
-                import glob
-                models = sorted(glob.glob(os.path.join(reg_dir, '*.joblib')))
-                if not models:
-                    raise FileNotFoundError(f"No model found in {reg_dir}")
-                model_path = models[-1]
-        self.logger.info(f"Input data: {input_path}")
-        self.logger.info(f"Model file: {model_path}")
+        # 1. Check input_path
+        if not input_path or not os.path.exists(input_path):
+            self.logger.error(f"Input data file not found: {input_path}")
+            raise FileNotFoundError(f"Input data file not found: {input_path}")
 
-        # 1. Load model
-        model = IOHandler.load_model(model_path)
+        # 2. Check model_path
+        if not model_path:
+            reg_dir = self.config['mlops']['registry_dir']
+            import glob
+            models = sorted(glob.glob(os.path.join(reg_dir, '*.joblib')))
+            if not models:
+                self.logger.error(f"No model found in {reg_dir}")
+                raise FileNotFoundError(f"No model found in {reg_dir}")
+            model_path = models[-1]
+        if not os.path.exists(model_path):
+            self.logger.error(f"Model file not found: {model_path}")
+            raise FileNotFoundError(f"Model file not found: {model_path}")
 
-        # 2. Load & transform input data
+        # 3. Load
         df = self.preprocessor.load_data(input_path)
+
+        # 4. Business Validation
+        br_report = self.validator.validate_business_rules(df)
+        if not br_report['passed']:
+            self.logger.warning("Business rule violations detected")
+
+        # 5. DRIFT CHECK (Optional)
+        if check_drift:
+            try:
+                train_test_dir = self.config['data']['train_test_dir']
+                raw_filename = self.config['data']['raw_path']
+                train_path, _ = get_latest_train_test(train_test_dir, raw_filename)
+                df_train = IOHandler.read_data(train_path)
+                detector = DataDriftDetector(df_train, self.logger)
+                report = detector.detect_drift(df, threshold=drift_threshold)
+                severity = report['summary']['drift_severity']
+                if severity == 'CRITICAL' and abort_on_critical:
+                    self.logger.error("CRITICAL DRIFT - Aborting prediction!")
+                    return None
+                elif severity in ['MODERATE', 'LOW']:
+                    self.logger.warning(f"{severity} drift detected")
+            except Exception as e:
+                self.logger.warning(f"Drift check failed: {e}")
+
+        # 6. Transform & Predict
+        # Check if encoder is available for categorical columns
+        if not self.transformer._learned_params['encoders']:
+            self.logger.error("No encoder found for categorical columns. Please train the pipeline first or use preprocessed data for prediction.")
+            raise RuntimeError("No encoder found for categorical columns. Please train the pipeline first or use preprocessed data for prediction.")
         X, _ = self.transformer.transform(df)
-
-        # 3. Predict
+        model = IOHandler.load_model(model_path)
         y_pred = model.predict(X)
-        y_pred_proba = model.predict_proba(X)[:, 1] if hasattr(model, 'predict_proba') else None
 
-        # 4. Save result
+        # 7. Save
         result_df = df.copy()
         result_df['prediction'] = y_pred
-        if y_pred_proba is not None:
-            result_df['probability'] = y_pred_proba
         if output_path is None:
             base = os.path.splitext(os.path.basename(input_path))[0]
             output_path = os.path.join('artifacts', 'predictions', f'{base}_predicted.csv')
@@ -704,177 +708,3 @@ class Pipeline:
         self.logger.info(f"Prediction saved: {output_path}")
         return output_path
 
-    def run_validate_and_predict(self, input_path: str,
-                                 drift_threshold: float = 0.05,
-                                 max_drift_ratio: float = 0.2,
-                                 abort_on_critical: bool = False,
-                                 perform_predict: bool = True) -> str:
-        """
-        Workflow: Validate → Check Drift → Predict (with safety checks)
-
-        Args:
-            input_path: Path to new data file
-            drift_threshold: P-value threshold for drift tests
-            max_drift_ratio: Maximum acceptable drift ratio before alert
-
-        Returns:
-            Path to prediction results or None if aborted
-        """
-        self.logger.info("\n" + "=" * 70)
-        self.logger.info("MODE: VALIDATE & PREDICT (WITH DRIFT DETECTION)")
-        self.logger.info("=" * 70)
-
-        # 1. Load new data
-        df_new = self.preprocessor.load_data(input_path)
-        self.logger.info(f"Loaded new data: {df_new.shape}")
-
-        # 2. Business validation (use DataQualityService)
-        validation_result = self.validator.validate_quality(df_new)
-        if validation_result.get('null_ratio', 0) > 0.3:
-            self.logger.warning("High null ratio detected. Proceed with caution.")
-
-        try:
-            br_conf = self.config.get('dataops', {}).get('business_rules', {})
-            br_report = self.validator.validate_business_rules(df_new)
-            # persist if configured
-            if br_conf.get('persist', True) and self.tracker.current_run_dir:
-                try:
-                    self.validator.persist_business_report(br_report, self.tracker.current_run_dir)
-                except Exception as e:
-                    self.logger.warning(f"Failed to persist business rules report: {e}")
-            # abort if configured
-            if not br_report.get('passed', True) and br_conf.get('fail_on_violation', False):
-                self.logger.error("Business rules violations detected and 'fail_on_violation' is True. Aborting prediction.")
-                return None
-        except Exception as e:
-            self.logger.warning(f"Business rules validation failed: {e}")
-
-        # 3. Load reference data (training data)
-        train_test_dir = self.config['data']['train_test_dir']
-        raw_filename = self.config['data'].get('raw_path')
-        train_path, _ = get_latest_train_test(train_test_dir, raw_filename)
-        df_train = IOHandler.read_data(train_path)
-        # Remove target if present
-        df_train_raw = df_train.drop(columns=[self.target_col], errors='ignore')
-
-        # 4. Drift Detection (use DriftService)
-        try:
-            drift_conf = self.config.get('dataops', {}).get('drift_detection', {})
-            reports_dir = self.config.get('dataops', {}).get('drift_reports_dir', None)
-            if not reports_dir:
-                reports_dir = os.path.join('artifacts', 'reports', 'drift')
-
-            detector = DataDriftDetector(df_train_raw, self.logger)
-            drift_report = detector.detect_drift(df_new, threshold=drift_conf.get('pvalue_threshold', drift_threshold), sample_frac=drift_conf.get('sample_frac', 1.0), max_rows=drift_conf.get('max_rows', None))
-            try:
-                drift_json_path, drift_md_path = detector.save_report(drift_report, reports_dir)
-                drift_report_path = drift_json_path
-            except Exception:
-                drift_report_path = None
-        except Exception as e:
-            self.logger.warning(f"Drift detection failed: {e}")
-            drift_report = {'summary': {'drift_severity': 'NONE', 'total_features_checked': 0, 'drifted_features': 0}, 'drift_details': {}}
-            drift_report_path = None
-
-        # 5. Decision: Predict or Alert
-        drift_severity = drift_report['summary']['drift_severity']
-        # compute drift ratio and check max threshold
-        total_checked = drift_report['summary'].get('total_features_checked', 0)
-        drifted_count = drift_report['summary'].get('drifted_features', 0)
-        drift_ratio = (drifted_count / total_checked) if total_checked > 0 else 0
-
-        if drift_severity == 'CRITICAL' or drift_ratio > max_drift_ratio:
-             self.logger.error("CRITICAL DRIFT - Prediction aborted!")
-             self.logger.error("Recommendation: Retrain model with new data")
-
-             # Save drift report
-            # (already persisted above)
-             return None
-
-        elif drift_severity in ['MODERATE', 'LOW']:
-            self.logger.warning(f"⚠ {drift_severity} drift detected. Proceeding with prediction...")
-            self.logger.warning("Consider retraining soon for better accuracy")
-
-        # 6. Proceed with prediction if requested
-        pred_path = None
-        if perform_predict:
-            pred_path = self.run_predict(input_path=input_path)
-
-        # 7. Log drift info to monitoring
-        self.monitor.log_performance(
-            model_name=self.trainer.best_model_name or 'latest',
-            metrics={'drift_severity': drift_severity},
-            notes=f"Drift check: {drift_report['summary']}"
-        )
-
-        return pred_path
-
-    def run_drift_check(self, new_data: pd.DataFrame, reference_data: pd.DataFrame = None,
-                        reference_loader: dict = None, threshold: float = 0.05,
-                        sample_frac: float = 1.0, max_rows: int = None) -> Tuple[Dict, str]:
-        """
-        Run drift detection between new_data (DataFrame) and reference_data (DataFrame).
-
-        If reference_data is None, attempt to load latest train data from config.
-        Saves a JSON report and a human-readable markdown summary under
-        artifacts/reports/drift/ by timestamp and returns (report_dict, report_path).
-        """
-        # Load reference if not provided
-        if reference_data is None:
-            train_test_dir = self.config['data']['train_test_dir']
-            raw_filename = self.config['data'].get('raw_path')
-            try:
-                train_path, _ = get_latest_train_test(train_test_dir, raw_filename)
-                reference_data = IOHandler.read_data(train_path)
-                reference_data = reference_data.drop(columns=[self.target_col], errors='ignore')
-            except Exception as e:
-                self.logger.error(f"Failed to load reference train data for drift check: {e}")
-                raise
-
-        # Ensure new_data is DataFrame
-        df_new = new_data.copy()
-
-        from src.ops.dataops.drift_detector import DataDriftDetector
-        detector = DataDriftDetector(reference_data, self.logger)
-        report = detector.detect_drift(df_new, threshold=threshold, sample_frac=sample_frac, max_rows=max_rows)
-
-        # Persist JSON and human-readable report
-        reports_dir = self.config.get('dataops', {}).get('drift_reports_dir', os.path.join('artifacts', 'reports', 'drift'))
-        ensure_dir(reports_dir)
-        ts = get_timestamp()
-        json_path = os.path.join(reports_dir, f"drift_{ts}.json")
-        try:
-            IOHandler.save_json(report, json_path)
-            self.logger.info(f"Drift report saved: {json_path}")
-        except Exception as e:
-            self.logger.warning(f"Failed to save drift json report: {e}")
-
-        # Write a small markdown summary
-        md_path = os.path.join(reports_dir, f"drift_{ts}.md")
-        try:
-            with open(md_path, 'w', encoding='utf-8') as f:
-                f.write(f"# Drift Report - {ts}\n\n")
-                f.write(f"**Severity**: {report['summary'].get('drift_severity')}\n\n")
-                f.write(f"**Total features checked**: {report['summary'].get('total_features_checked')}\n\n")
-                f.write(f"**Drifted features**: {report['summary'].get('drifted_features')}\n\n")
-                f.write("## Drift Details (summary)\n\n")
-                # list drifted numerical
-                num_d = report['drift_details'].get('numerical', {})
-                drifted_nums = num_d.get('drifted_features', [])
-                if drifted_nums:
-                    f.write("### Numerical drifted features\n")
-                    for col in drifted_nums:
-                        info = num_d['ks_results'].get(col, {})
-                        f.write(f"- {col}: p={info.get('p_value')}, ks={info.get('ks_statistic')}, mean_diff={info.get('mean_diff')}\n")
-                cat_d = report['drift_details'].get('categorical', {})
-                drifted_cats = cat_d.get('drifted_features', [])
-                if drifted_cats:
-                    f.write("\n### Categorical drifted features\n")
-                    for col in drifted_cats:
-                        info = cat_d['chi2_results'].get(col, {})
-                        f.write(f"- {col}: p={info.get('p_value')}, new_categories={info.get('new_categories')}\n")
-            self.logger.info(f"Drift summary saved: {md_path}")
-        except Exception as e:
-            self.logger.warning(f"Failed to save drift markdown summary: {e}")
-
-        return report, json_path

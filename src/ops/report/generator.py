@@ -224,6 +224,56 @@ class ReportGenerator:
         lines.append("")
         return lines
 
+    def _generate_training_section(self, run_dir: str, best_model_name: str, all_metrics: Dict[str, Dict[str, float]], feature_importance: Optional[pd.DataFrame] = None) -> list:
+        """Generate training section for markdown report."""
+        lines = []
+        lines.append("## Model Training & Evaluation")
+        lines.append("")
+        if best_model_name:
+            lines.append(f"**Best Model:** {best_model_name.upper()}")
+            lines.append("")
+        lines.append("### Metrics")
+        lines.append("")
+        lines.append("| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |")
+        lines.append("|:------|:--------:|:--------:|:------:|:--:|:-------:|")
+        for mname, metrics in (all_metrics or {}).items():
+            acc = metrics.get('accuracy', '')
+            prec = metrics.get('precision', '')
+            rec = metrics.get('recall', '')
+            f1 = metrics.get('f1', '')
+            roc = metrics.get('roc_auc', '')
+            f1s = f"{float(f1):.4f}" if f1 != '' and f1 is not None else ''
+            lines.append(f"| {mname.upper()} | {acc} | {prec} | {rec} | {f1s} | {roc} |")
+        lines.append("")
+        if feature_importance is not None:
+            lines.append("### Feature Importance")
+            lines.append("")
+            lines.append("| Feature | Importance |")
+            lines.append("|:--------|:----------:|")
+            for _, row in feature_importance.iterrows():
+                lines.append(f"| {row['feature']} | {row['importance']} |")
+            lines.append("")
+        # Add evaluation figures if available
+        eval_fig_dir = os.path.join(run_dir, 'figures', 'evaluation')
+        if os.path.isdir(eval_fig_dir):
+            lines.append("### Evaluation Visualizations")
+            lines.append("")
+            for fname in sorted(os.listdir(eval_fig_dir)):
+                if fname.lower().endswith('.png'):
+                    rel_path = f"figures/evaluation/{fname}"
+                    lines.append(f"#### {fname.replace('_', ' ').replace('.png', '').title()}")
+                    lines.append("")
+                    lines.append(f"![{fname}]({rel_path})")
+                    lines.append("")
+                    insights = figure_insights(fname, {}, all_metrics, feature_importance)
+                    if insights:
+                        for insight in insights:
+                            lines.append(insight)
+                        lines.append("")
+        lines.append("---")
+        lines.append("")
+        return lines
+
     def generate_training_report(
             self,
             run_id: str,

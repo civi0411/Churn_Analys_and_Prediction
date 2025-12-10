@@ -17,14 +17,14 @@ data:
 # ========================
 dataops:
   versions_dir: "artifacts/versions"
-  # Business rules validation options
-  business_rules:
-    # If true, pipeline will raise an error and abort when violations are found
-    fail_on_violation: false
-    # Persist business rules report into run folder (recommended)
-    persist: true
-    # Mask PII in persisted report (not implemented fully yet; reserved)
-    mask_pii: true
+  drift_detection:
+    enabled: true                    # Bật/tắt drift check
+    pvalue_threshold: 0.05           # Ngưỡng p-value cho statistical tests
+    max_drift_ratio: 0.2             # Tỷ lệ drift tối đa chấp nhận được (20%)
+    abort_on_critical: true          # Hủy prediction nếu CRITICAL drift
+    sample_frac: 1.0                 # Tỷ lệ sample dữ liệu (1.0 = 100%)
+    max_rows: null                   # Giới hạn số dòng check (null = không giới hạn)
+    reports_dir: "artifacts/reports/drift"  # Thư mục lưu báo cáo
 
 mlops:
   registry_dir: "artifacts/registry"

@@ -45,7 +45,7 @@ Examples:
     )
 
     parser.add_argument('--mode', type=str, default='full',
-                        choices=['full', 'preprocess', 'train', 'eda', 'visualize', 'predict', 'drift'],
+                        choices=['full', 'preprocess', 'train', 'eda', 'visualize', 'predict'],
                         help='Chế độ chạy pipeline (default: full)')
 
     parser.add_argument('--data', type=str, default=None,
@@ -59,12 +59,6 @@ Examples:
 
     parser.add_argument('--config', type=str, default='config/config.yaml',
                         help="Đường dẫn file config")
-
-    parser.add_argument('--drift-threshold', type=float, default=0.05,
-                        help='P-value threshold for drift detection (default: 0.05)')
-
-    parser.add_argument('--max-drift-ratio', type=float, default=0.2,
-                        help='Max acceptable drift ratio before alert (default: 0.2)')
 
     args = parser.parse_args()
 
