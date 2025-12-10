@@ -49,7 +49,6 @@ from .ops import (
     DataVersioning, ModelMonitor, ModelExplainer, ReportGenerator
 )
 from .ops.dataops.validator import DataValidator
-from .ops.dataops.drift_detector import DataDriftDetector
 from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timestamp, ensure_dir, Logger
 
 
@@ -90,8 +89,8 @@ class Pipeline:
         self.config = config
         self.logger = logger
         self.target_col = config['data']['target_col']
-        self.train_raw_path = config['data']['raw_path']  # Lưu lại file raw gốc
-
+        # Đảm bảo khi predict với --data khác, ta vẫn tìm đúng file cleaned train
+        self.train_raw_path = config['data'].get('original_raw_path', config['data']['raw_path'])
 
         # Set Global Seed
         set_random_seed(config['data'].get('random_state', 42))
@@ -703,7 +702,7 @@ class Pipeline:
         if drift_config.get('enabled', True):
             from .ops.dataops.drift_detector import DataDriftDetector
             processed_dir = self.config['data']['processed_dir']
-            train_raw_base = os.path.splitext(os.path.basename(self.train_raw_path))[0]  # Dùng file raw gốc
+            train_raw_base = os.path.splitext(os.path.basename(self.train_raw_path))[0]
             cleaned_train_path = os.path.join(processed_dir, f"{train_raw_base}_cleaned.parquet")
             cleaned_train_path = os.path.normpath(cleaned_train_path)
             if not os.path.exists(cleaned_train_path):
@@ -722,8 +721,7 @@ class Pipeline:
             if severity == 'CRITICAL' and drift_config.get('abort_on_critical', True):
                 self.logger.error("CRITICAL DRIFT DETECTED - Aborting prediction")
                 return None
-            # Save drift report
-            detector.save_report(report, drift_config.get('reports_dir'))
+            # KHÔNG LƯU drift report ra file nữa
 
         # 6. Transform & Predict
         X, _ = self.transformer.transform(df_clean)
@@ -766,4 +764,3 @@ class Pipeline:
                         self.logger.warning(f"[Drift] Numeric column '{col}' contains non-numeric values: {e}. Will skip this column in drift check.")
                     df.drop(columns=[col], inplace=True)
         return df
-

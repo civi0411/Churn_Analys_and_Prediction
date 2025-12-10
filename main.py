@@ -66,7 +66,8 @@ Examples:
     try:
         config = ConfigLoader.load_config(args.config)
 
-        # (No shortcut flag) --mode drift is explicit
+        # Ghi lại raw data path để tránh ghi đè bởi --data
+        original_raw_path = config['data']['raw_path']
 
         # Handle --data: accept a single file path (absolute or relative to project root or data/)
         if args.data:
@@ -84,6 +85,7 @@ Examples:
                     print(f"[ERROR] Data file not found: {args.data}")
                     sys.exit(1)
 
+        config['data']['original_raw_path'] = original_raw_path
         log_dir = config.get('artifacts', {}).get('logs_dir', 'artifacts/logs')
         log_level = config.get('logging', {}).get('level', 'INFO')
         logger = Logger.get_logger(name='MAIN', log_dir=log_dir, level=log_level)
@@ -112,7 +114,7 @@ Examples:
         pipeline = Pipeline(config, logger)
 
         if args.mode == 'predict':
-            # Run prediction only (no drift pre-check)
+            # Run prediction only
             input_path = args.data or config['data'].get('raw_path')
             model_path = None
             output_path = None

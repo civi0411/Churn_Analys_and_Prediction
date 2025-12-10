@@ -313,67 +313,10 @@ class DataDriftDetector:
         else:
             return 'NONE'
 
-    def save_report(self, report: Dict[str, Any], reports_dir: Optional[str] = None) -> Tuple[str, str]:
-        """
-        Persist the drift report as JSON and a human-readable markdown summary.
-
-        Returns: (json_path, md_path)
-        """
-        if reports_dir is None:
-            reports_dir = os.path.join('artifacts', 'reports', 'drift')
-        ensure_dir(reports_dir)
-        ts = get_timestamp()
-        json_path = os.path.join(reports_dir, f"drift_{ts}.json")
-        try:
-            IOHandler.save_json(report, json_path)
-            if self.logger:
-                self.logger.info(f"Drift report saved: {json_path}")
-        except Exception as e:
-            if self.logger:
-                self.logger.warning(f"Failed to save drift json report: {e}")
-
-        md_path = os.path.splitext(json_path)[0] + '.md'
-        try:
-            with open(md_path, 'w', encoding='utf-8') as f:
-                f.write(f"# Drift Report - {ts}\n\n")
-                f.write(f"**Severity**: {report['summary'].get('drift_severity')}\n\n")
-                f.write(f"**Total features checked**: {report['summary'].get('total_features_checked')}\n\n")
-                f.write(f"**Drifted features**: {report['summary'].get('drifted_features')}\n\n")
-                f.write("## Drift Details (summary)\n\n")
-                num_d = report['drift_details'].get('numerical', {})
-                drifted_nums = num_d.get('drifted_features', [])
-                if drifted_nums:
-                    f.write("### Numerical drifted features\n")
-                    for col in drifted_nums:
-                        info = num_d['ks_results'].get(col, {})
-                        f.write(f"- {col}: p={info.get('p_value')}, ks={info.get('ks_statistic')}, mean_diff={info.get('mean_diff')}\n")
-                cat_d = report['drift_details'].get('categorical', {})
-                drifted_cats = cat_d.get('drifted_features', [])
-                if drifted_cats:
-                    f.write("\n### Categorical drifted features\n")
-                    for col in drifted_cats:
-                        info = cat_d['chi2_results'].get(col, {})
-                        f.write(f"- {col}: p={info.get('p_value')}, new_categories={info.get('new_categories')}\n")
-            if self.logger:
-                self.logger.info(f"Drift summary saved: {md_path}")
-        except Exception as e:
-            if self.logger:
-                self.logger.warning(f"Failed to save drift markdown summary: {e}")
-
-        return json_path, md_path
-
 def detect_drift_full(df_train, df_predict, logger=None, threshold=0.05, report_path=None):
     """
     Hàm drift detection tổng hợp cho cả numeric và categorical, tổng hợp severity, lưu report nếu cần.
     """
     detector = DataDriftDetector(df_train, logger)
     report = detector.detect_drift(df_predict, threshold=threshold)
-    # Lưu report nếu có report_path
-    if report_path:
-        ensure_dir(os.path.dirname(report_path))
-        import json
-        with open(report_path, 'w', encoding='utf-8') as f:
-            json.dump(report, f, indent=2, ensure_ascii=False)
-        if logger:
-            logger.info(f"Drift report saved: {report_path}")
     return report
