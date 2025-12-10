@@ -1,0 +1,8 @@
+Cleanup Plan for tests/ folder:
+- Remove empty test files: test_data/test_preprocessor.py, test_data/test_transformer.py, test_models/test_evaluator.py, test_models/test_optimizer.py, test_models/test_trainer.py
+- Remove tmp_report_test.py (manual debug)
+- Remove all __pycache__ folders in tests/ and subfolders
+- Keep only relevant test files and data
+- Ensure conftest.py only has necessary fixtures
+- Remove unused data files in tests/data/
+

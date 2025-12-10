@@ -1,276 +1,321 @@
-import os
-from datetime import datetime
-from typing import Dict, Any, List, Optional
-import json
-import pandas as pd
+"""
+src/ops/report/generator.py
 
-from ..reporting_helpers import sanitize_text, figure_insights
+Simplified Report Generator - Markdown reports with embedded figures
+"""
+import os
+import json
+from datetime import datetime
+from typing import Dict, Any, Optional
+import pandas as pd
 from ...utils import ensure_dir
 
 
-class ReportGenerator:
-    """Simplified, focused ReportGenerator placed under src.ops.report
+def sanitize_text(text):
+    """Sanitize text for markdown/reporting."""
+    if not isinstance(text, str):
+        return str(text)
+    return text.replace('|', '').replace('`', '').replace('\n', ' ').strip()
 
-    Responsibilities:
-    - Produce per-run markdown report under the run directory
-    - Support modes: eda, train, full, visualize, preprocess
-    - Embed figures using relative links to run-specific figures
-    - Generate concise, dashboard-like markdown
+
+def figure_insights(fname, best_metrics, all_metrics, feature_importance):
+    """Generate insights for a figure. Placeholder implementation."""
+    insights = []
+    # Example: Add custom logic for each figure type
+    if 'missing' in fname:
+        insights.append('Biểu đồ này cho thấy tỷ lệ thiếu dữ liệu trên từng trường.')
+    elif 'correlation' in fname:
+        insights.append('Biểu đồ này thể hiện mức độ tương quan giữa các biến và nhãn Churn.')
+    elif 'churn_by_category' in fname:
+        insights.append('Phân tích churn theo từng phân khúc ngành hàng.')
+    elif 'roc_curve' in fname:
+        insights.append('Đường cong ROC cho thấy khả năng phân biệt giữa các lớp của mô hình.')
+    elif 'confusion_matrix' in fname:
+        insights.append('Ma trận nhầm lẫn giúp đánh giá chi tiết các loại lỗi của mô hình.')
+    elif 'feature_importance' in fname:
+        insights.append('Biểu đồ này cho thấy các đặc trưng quan trọng nhất ảnh hưởng đến dự đoán churn.')
+    # Add more cases as needed
+    return insights
+
+
+class ReportGenerator:
+    """
+    Generate markdown reports for each run with embedded figures.
+
+    Reports are saved in: artifacts/experiments/{run_id}/report.md
     """
 
-    def __init__(self, reports_dir: str = None, experiments_base_dir: str = "artifacts/experiments", logger=None):
+    def __init__(self, experiments_base_dir: str = "artifacts/experiments", logger=None):
         self.experiments_base_dir = experiments_base_dir
-        self.reports_dir = reports_dir or os.path.join("artifacts", "reports")
-        ensure_dir(self.reports_dir)
         self.logger = logger
+        # Ensure base directory exists on init for compatibility with tests
+        ensure_dir(self.experiments_base_dir)
 
     def _get_run_dir(self, run_id: str) -> Optional[str]:
         if not run_id:
             return None
-        run_dir = os.path.join(self.experiments_base_dir, run_id)
-        return run_dir
+        return os.path.join(self.experiments_base_dir, run_id)
 
-    def generate_training_report(self, run_id: str, best_model_name: str, all_metrics: Dict[str, Dict[str, float]],
-                                 feature_importance: Optional[pd.DataFrame] = None, config: Optional[Dict[str, Any]] = None,
-                                 eda_summary: Optional[Dict[str, Any]] = None, format: str = "markdown", mode: str = "train",
-                                 optimize: bool = True, args=None) -> str:
+    def generate_report(
+            self,
+            run_id: str,
+            mode: str,
+            optimize: bool = False,
+            best_model_name: str = None,
+            all_metrics: Dict[str, Dict[str, float]] = None,
+            feature_importance: Optional[pd.DataFrame] = None,
+            eda_summary: Optional[Dict[str, Any]] = None,
+            config: Optional[Dict[str, Any]] = None
+    ) -> Optional[str]:
+        """
+        Generate comprehensive markdown report based on mode.
+
+        Args:
+            run_id: Run identifier
+            mode: 'eda', 'train', 'full', 'preprocess', 'visualize'
+            optimize: Whether hyperparameter tuning was used
+            best_model_name: Name of best performing model
+            all_metrics: Dictionary of all model metrics
+            feature_importance: DataFrame with feature importance
+            eda_summary: EDA statistics summary
+            config: Configuration dict
+
+        Returns:
+            Path to generated report
+        """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         run_dir = self._get_run_dir(run_id)
-        if run_dir:
-            ensure_dir(run_dir)
-        filename_md = f"training_report_{run_id}.md"
-        filename_json = f"training_report_{run_id}.json"
 
-        lines: List[str] = []
-        best_metrics = all_metrics.get(best_model_name, {})
-        eval_fig_dir = os.path.join(run_dir, 'figures', 'evaluation') if run_dir else None
+        if not run_dir:
+            if self.logger:
+                self.logger.warning("No run_id provided, skipping report generation")
+            return None
 
-        # Header / Dashboard
-        lines.append(f"# 🏆 Báo Cáo Huấn Luyện Tự Động (Training Report) — {sanitize_text(run_id)}")
-        lines.append("")
-        lines.append("## 🎯 Tổng Quan Dữ Liệu & Quy Trình")
-        lines.append("")
-        lines.append("| Chi tiết | Giá trị |")
-        lines.append("| :--- | :--- |")
-        lines.append(f"| **Run ID** | `{sanitize_text(run_id)}` |")
-        lines.append(f"| **Thời gian Thực hiện** | {timestamp} |")
-        lines.append(f"| **Mode** | {mode} |")
-        lines.append(f"| **Optimize** | {optimize} |")
-        lines.append(f"| **Best Model** | {best_model_name} |")
-        lines.append("")
-        lines.append("---\n")
+        ensure_dir(run_dir)
+        report_path = os.path.join(run_dir, "report.md")
 
-        if mode == 'eda' and eda_summary:
-            churn_rate = eda_summary.get('churn_rate', None)
-            lines.append("## 🔍 Tóm Tắt Phân Tích Dữ Liệu (EDA)")
-            if churn_rate is not None:
-                # explicit guard for static type checkers
-                assert churn_rate is not None
-                # safe formatting - coerce to float when possible
-                try:
-                    churn_rate_f = float(churn_rate)
-                    lines.append(f"* **Vấn đề Mất cân bằng:** Tỷ lệ Churn (Lớp 1) là **{churn_rate_f:.2%}** — Non-Churn **{(1-churn_rate_f):.2%}**.")
-                except Exception:
-                    lines.append(f"* **Vấn đề Mất cân bằng:** Tỷ lệ Churn (Lớp 1): {churn_rate}")
-            if 'top_correlated' in eda_summary:
-                top = eda_summary.get('top_correlated', [])[:3]
-                if top:
-                    lines.append(f"* **Tương quan ban đầu (Top):** {', '.join(top)}")
-            lines.append("")
-            eda_fig_dir = os.path.join(run_dir or '', 'figures', 'eda') if run_dir else None
-            if eda_fig_dir and os.path.isdir(eda_fig_dir):
-                lines.append("### Key Visualizations (EDA)")
-                for fname in sorted(os.listdir(eda_fig_dir)):
-                    if fname.lower().endswith('.png'):
-                        rel = f"figures/eda/{fname}"
-                        lines.append(f"**{fname}**")
-                        lines.append("")
-                        lines.append(f"![{fname}]({rel})")
-                        insights = figure_insights(fname, best_metrics or {}, all_metrics or {}, feature_importance)
-                        for l in insights:
-                            lines.append(l)
-                        lines.append("")
-            lines.append(self._footer())
-            path = os.path.join(run_dir or self.reports_dir, filename_md)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(lines))
-            return path
+        lines = []
 
-        # TRAIN or FULL mode
-        if mode in ('train', 'full'):
-            # Leaderboard
-            lines.append("## 📊 Bảng Xếp Hạng Thuật Toán (Model Leaderboard)")
-            all_metric_keys = set()
-            for m in all_metrics.values():
-                all_metric_keys.update(m.keys())
-            keys = [k for k in ['accuracy','f1','precision','recall','roc_auc'] if k in all_metric_keys]
-            header = "| Model | " + " | ".join(k.upper() for k in keys) + " |"
-            sep = "|:------|" + "|".join(["------:"] * len(keys)) + "|"
-            lines.append(header)
-            lines.append(sep)
-            for name, metrics in sorted(all_metrics.items(), key=lambda x: x[1].get('f1', 0), reverse=True):
-                row_vals = [f"{metrics.get(k, 0):.4f}" for k in keys]
-                if name == best_model_name:
-                    row = f"| **{name}** 🏆 | " + " | ".join(f"**{v}**" for v in row_vals) + " |"
-                else:
-                    row = f"| {name} | " + " | ".join(row_vals) + " |"
-                lines.append(row)
-            lines.append("")
-
-            # Champion metrics
-            lines.append("---\n")
-            lines.append(f"## 🥇 Kết Quả Đánh Giá Mô Hình Tốt Nhất — {best_model_name.upper()}")
-            lines.append("")
-            lines.append("| Metric | Giá trị | Ngưỡng MLOps (Min) | Trạng Thái |")
-            lines.append("| :--- | :--- | :--- | :--- |")
-            lines.append(f"| **Accuracy** | **{best_metrics.get('accuracy',0):.4f}** | > 0.75 | {'✅ PASS' if best_metrics.get('accuracy',0)>0.75 else '❌ FAIL'} |")
-            lines.append(f"| **F1-Score** | **{best_metrics.get('f1',0):.4f}** | > 0.70 | {'✅ PASS' if best_metrics.get('f1',0)>0.70 else '❌ FAIL'} |")
-            lines.append(f"| **Recall (Churn Coverage)** | {best_metrics.get('recall',0):.4f} | - | - |")
-            lines.append(f"| **ROC-AUC** | **{best_metrics.get('roc_auc',0):.4f}** | - | - |")
-            lines.append("")
-
-            # Evaluation figures
-            if eval_fig_dir and os.path.isdir(eval_fig_dir):
-                lines.append("## 🖼️ Evaluation Figures & Analysis")
-                for fname in sorted(os.listdir(eval_fig_dir)):
-                    if fname.lower().endswith('.png'):
-                        rel = f"figures/evaluation/{fname}"
-                        lines.append(f"### {fname}")
-                        lines.append("")
-                        lines.append(f"![{fname}]({rel})")
-                        insights = figure_insights(fname, best_metrics, all_metrics, feature_importance)
-                        for l in insights:
-                            lines.append(l)
-                        lines.append("")
-                lines.append("---\n")
-
-            # Feature importance
-            if feature_importance is not None:
-                lines.append("## 📈 Giải Thích Mô Hình (Feature Importance)")
-                try:
-                    top = feature_importance.head(10)
-                    lines.append("| Feature | Importance |")
-                    lines.append("| :--- | ---: |")
-                    for _, r in top.iterrows():
-                        lines.append(f"| {r['feature']} | {r['importance']:.4f} |")
-                    lines.append("")
-                except Exception:
-                    pass
-
-            lines.append("## 🚨 Kết Luận & Kế Hoạch Giám Sát")
-            lines.append(f"- Mô hình được chọn làm baseline: {best_model_name}")
-            lines.append("- Kích hoạt monitoring cho F1 và Data Drift.")
-            lines.append("")
-            # Compact experiment signature (short, reproducible summary)
-            if config:
-                try:
-                    sig = {
-                        'run_id': run_id,
-                        'timestamp': timestamp,
-                        'mode': mode,
-                        'optimize': bool(optimize),
-                        'data_path': config.get('data', {}).get('raw_path'),
-                        'random_state': config.get('data', {}).get('random_state'),
-                        'models': list(config.get('models', {}).keys())[:10]
-                    }
-                    import yaml
-                    lines.append('---')
-                    lines.append('## Experiment Signature')
-                    lines.append('```yaml')
-                    lines.extend(yaml.dump(sig, default_flow_style=False, allow_unicode=True).splitlines())
-                    lines.append('```')
-                except Exception:
-                    # fallback to minimal signature
-                    lines.append('---')
-                    lines.append('## Experiment Signature')
-                    lines.append(f"- run_id: {run_id}")
-                    lines.append(f"- mode: {mode}")
-                    lines.append(f"- optimize: {optimize}")
-                    lines.append(f"- data_path: {config.get('data', {}).get('raw_path')}")
-                    lines.append("")
-
-            lines.append(self._footer())
-
-            path_md = os.path.join(run_dir or self.reports_dir, filename_md)
-            md_text = '\n'.join(lines)
-            with open(path_md, 'w', encoding='utf-8') as f:
-                f.write(md_text)
-
-            # Optionally also emit JSON summary when requested
-            if format == 'json':
-                summary = {
-                    'run_id': run_id,
-                    'timestamp': timestamp,
-                    'mode': mode,
-                    'optimize': optimize,
-                    'best_model': best_model_name,
-                    'best_metrics': best_metrics,
-                    'all_metrics': all_metrics
-                }
-                path_json = os.path.join(run_dir or self.reports_dir, filename_json)
-                with open(path_json, 'w', encoding='utf-8') as fj:
-                    json.dump(summary, fj, indent=2, ensure_ascii=False)
-                return path_json
-
-            # Markdown-first: always return Markdown path unless caller explicitly requested JSON
-            return path_md
-
-        # fallback
-        path = os.path.join(run_dir or self.reports_dir, filename_md)
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(["No content for selected mode."]))
-        return path
-
-    def generate_eda_report(self, df: pd.DataFrame, filename: str, target_col: Optional[str] = None, format: str = 'markdown', run_id: Optional[str] = None) -> str:
-        """Generate a focused EDA markdown report and save to the run directory if provided.
-
-        Embeds figures found under <run_dir>/figures/eda and auto-generates insights.
-        """
-        run_dir = self._get_run_dir(run_id) if run_id else None
-        if run_dir:
-            ensure_dir(run_dir)
-        filename_md = f"{filename}.md" if filename.endswith('.md') is False else filename
-        lines: List[str] = []
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        lines.append(f"# EDA Report — {sanitize_text(filename)}")
+        # === HEADER ===
+        lines.append(f"# 🚀 ML Pipeline Report - Run {sanitize_text(run_id)}")
         lines.append("")
         lines.append(f"**Generated:** {timestamp}")
         lines.append("")
-        lines.append("## Dataset Summary")
-        lines.append("")
-        lines.append(f"- Rows: {df.shape[0]}")
-        lines.append(f"- Columns: {df.shape[1]}")
-        if target_col and target_col in df.columns:
-            try:
-                churn_rate = df[target_col].value_counts(normalize=True).get(1, 0)
-                lines.append(f"- Churn Rate: {churn_rate:.2%}")
-            except Exception:
-                lines.append(f"- Churn Rate: unknown")
+        lines.append("---")
         lines.append("")
 
-        eda_fig_dir = os.path.join(run_dir or '', 'figures', 'eda') if run_dir else None
-        if eda_fig_dir and os.path.isdir(eda_fig_dir):
-            lines.append("## Key Visualizations")
+        # === RUN INFORMATION ===
+        lines.append("## 📋 Run Information")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|:----------|:------|")
+        lines.append(f"| **Run ID** | `{sanitize_text(run_id)}` |")
+        lines.append(f"| **Mode** | `{mode.upper()}` |")
+        lines.append(f"| **Optimize** | `{optimize}` |")
+        if config:
+            lines.append(f"| **Data Source** | `{config.get('data', {}).get('raw_path', 'N/A')}` |")
+            lines.append(f"| **Test Size** | `{config.get('data', {}).get('test_size', 0.2)}` |")
+        if best_model_name:
+            lines.append(f"| **Best Model** | `{best_model_name}` |")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+        # === EDA SECTION ===
+        if mode in ['eda', 'full'] and eda_summary:
+            lines.extend(self._generate_eda_section(run_dir, eda_summary))
+
+        # === TRAINING SECTION ===
+        if mode in ['train', 'full'] and all_metrics:
+            lines.extend(self._generate_training_section(
+                run_dir, best_model_name, all_metrics, feature_importance
+            ))
+
+        # === PREPROCESSING SECTION ===
+        if mode == 'preprocess':
+            lines.append("## 🔧 Data Preprocessing")
+            lines.append("")
+            lines.append("✅ Data preprocessing completed successfully.")
+            lines.append("")
+            lines.append("**Steps performed:**")
+            lines.append("1. Data loading and validation")
+            lines.append("2. Data cleaning (duplicates, standardization)")
+            lines.append("3. Train/test split with stratification")
+            lines.append("4. Feature transformation and scaling")
+            lines.append("")
+            lines.append("**Output files:**")
+            lines.append(f"- `{run_dir}/data/` - Processed datasets")
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+
+        # === FOOTER ===
+        lines.append("---")
+        lines.append("")
+        lines.append("_Report auto-generated by ML Pipeline_")
+        lines.append("")
+
+        # Write report
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines))
+
+        if self.logger:
+            self.logger.info(f"Report Generated | {report_path}")
+
+        return report_path
+
+    def _generate_eda_section(self, run_dir: str, eda_summary: Dict) -> list:
+        """Generate EDA section with visualizations."""
+        lines = []
+
+        lines.append("## 🔍 Exploratory Data Analysis")
+        lines.append("")
+
+        # Statistics
+        lines.append("### 📊 Dataset Statistics")
+        lines.append("")
+        lines.append("| Metric | Value |")
+        lines.append("|:-------|:------|")
+        lines.append(f"| **Rows** | {eda_summary.get('n_rows', 'N/A'):,} |")
+        lines.append(f"| **Columns** | {eda_summary.get('n_cols', 'N/A')} |")
+        lines.append(f"| **Missing Values** | {eda_summary.get('missing', 0)} |")
+        lines.append(f"| **Duplicates** | {eda_summary.get('duplicate', 0)} |")
+
+        if 'churn_rate' in eda_summary:
+            churn_rate = eda_summary['churn_rate']
+            try:
+                churn_pct = float(churn_rate) * 100
+                lines.append(f"| **Churn Rate** | {churn_pct:.2f}% |")
+            except:
+                lines.append(f"| **Churn Rate** | {churn_rate} |")
+
+        lines.append("")
+
+        # Key Insights
+        if 'top_correlated' in eda_summary and eda_summary['top_correlated']:
+            lines.append("### 💡 Key Insights")
+            lines.append("")
+            top_features = eda_summary['top_correlated'][:3]
+            lines.append(f"**Top correlated features with target:** {', '.join(top_features)}")
+            lines.append("")
+
+        # Visualizations
+        eda_fig_dir = os.path.join(run_dir, 'figures', 'eda')
+        if os.path.isdir(eda_fig_dir):
+            lines.append("### 📈 Visualizations")
+            lines.append("")
+
             for fname in sorted(os.listdir(eda_fig_dir)):
                 if fname.lower().endswith('.png'):
-                    rel = f"figures/eda/{fname}"
-                    lines.append(f"### {fname}")
+                    rel_path = f"figures/eda/{fname}"
+                    lines.append(f"#### {fname.replace('_', ' ').replace('.png', '').title()}")
                     lines.append("")
-                    lines.append(f"![{fname}]({rel})")
+                    lines.append(f"![{fname}]({rel_path})")
+                    lines.append("")
+
+                    # Add insights
                     insights = figure_insights(fname, {}, {}, None)
-                    for l in insights:
-                        lines.append(l)
-                    lines.append("")
+                    if insights:
+                        for insight in insights:
+                            lines.append(insight)
+                        lines.append("")
 
-        lines.append(self._footer())
+        lines.append("---")
+        lines.append("")
+        return lines
 
-        path_md = os.path.join(run_dir or self.reports_dir, filename_md)
-        md_text = '\n'.join(lines)
-        with open(path_md, 'w', encoding='utf-8') as f:
-            f.write(md_text)
+    def generate_training_report(
+            self,
+            run_id: str,
+            best_model_name: str,
+            all_metrics: Dict[str, Dict[str, float]],
+            feature_importance: Optional[pd.DataFrame] = None,
+            config: Optional[Dict[str, Any]] = None,
+            format: str = 'markdown'
+    ) -> Optional[str]:
+        """
+        Compatibility wrapper used by tests. Produces either a markdown (.md) or JSON (.json)
+        training report under the run directory.
+        """
+        run_dir = self._get_run_dir(run_id)
+        if not run_dir:
+            if self.logger:
+                self.logger.warning("No run_id provided, skipping report generation")
+            return None
 
-        return path_md
+        ensure_dir(run_dir)
 
-    def _footer(self) -> str:
-        return "---\n\n_Report auto-generated by ML Pipeline_"
+        fmt = format.lower()
+        if fmt not in ('markdown', 'json'):
+            fmt = 'markdown'
+
+        if fmt == 'markdown':
+            report_path = os.path.join(run_dir, 'training_report.md')
+            lines = []
+            lines.append(f"# Training Report - {sanitize_text(run_id)}")
+            lines.append("")
+            lines.append(f"**Best Model**: {best_model_name.upper()}")
+            lines.append("")
+            lines.append("## Metrics")
+            lines.append("")
+            # Table header
+            lines.append("| Model | Accuracy | Precision | Recall | F1 | ROC-AUC |")
+            lines.append("|:------|:--------:|:--------:|:------:|:--:|:-------:|")
+
+            for mname, metrics in (all_metrics or {}).items():
+                acc = metrics.get('accuracy', '')
+                prec = metrics.get('precision', '')
+                rec = metrics.get('recall', '')
+                f1 = metrics.get('f1', '')
+                roc = metrics.get('roc_auc', '')
+                # Format f1 to 4 decimals if present
+                f1s = f"{float(f1):.4f}" if f1 != '' and f1 is not None else ''
+                lines.append(f"| {mname.upper()} | {acc} | {prec} | {rec} | {f1s} | {roc} |")
+
+            if feature_importance is not None:
+                lines.append("")
+                lines.append("## Feature Importance")
+                lines.append("")
+                # Simple table
+                lines.append("| Feature | Importance |")
+                lines.append("|:--------|:----------:|")
+                for _, row in feature_importance.iterrows():
+                    lines.append(f"| {row['feature']} | {row['importance']} |")
+
+            # Include configuration summary if provided
+            if config:
+                lines.append("")
+                lines.append("## Configuration")
+                lines.append("")
+                try:
+                    # Briefly summarize top-level keys and values
+                    for k, v in (config or {}).items():
+                        lines.append(f"- **{k}**: {sanitize_text(str(v))}")
+                except Exception:
+                    lines.append("- Configuration summary not available")
+
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+
+            if self.logger:
+                self.logger.info(f"Report Generated | {report_path}")
+
+            return report_path
+
+        else:  # json
+            report_path = os.path.join(run_dir, 'training_report.json')
+            payload = {
+                'run_id': run_id,
+                'best_model': best_model_name,
+                'all_metrics': all_metrics,
+            }
+            if feature_importance is not None:
+                payload['feature_importance'] = feature_importance.to_dict(orient='records')
+
+            with open(report_path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, indent=4, ensure_ascii=False)
+
+            if self.logger:
+                self.logger.info(f"Report Generated | {report_path}")
+
+            return report_path

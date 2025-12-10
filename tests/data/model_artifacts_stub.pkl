@@ -1,3 +1,0 @@
-# The contents of the file: /Churn_Analysis_and_Predict/Churn_Analysis_and_Predict/tests/data/model_artifacts_stub.pkl
-
-# This file is intentionally left blank.

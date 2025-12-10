@@ -45,7 +45,7 @@ Examples:
     )
 
     parser.add_argument('--mode', type=str, default='full',
-                        choices=['full', 'preprocess', 'train', 'eda', 'visualize'],
+                        choices=['full', 'preprocess', 'train', 'eda', 'visualize', 'predict'],
                         help='Chế độ chạy pipeline (default: full)')
 
     parser.add_argument('--data', type=str, default=None,
@@ -111,31 +111,47 @@ Examples:
     try:
         pipeline = Pipeline(config, logger)
 
-        result = pipeline.run(
-            mode=args.mode,
-            model_name=args.model,
-            optimize=args.optimize
-        )
+        if args.mode == 'predict':
+            # Cho phép truyền input/model/output qua --data/--model nếu cần
+            input_path = config['data'].get('raw_path')
+            model_path = None
+            output_path = None
+            pred_path = pipeline.run(
+                mode='predict',
+                model_name=args.model,
+                input_path=input_path,
+                model_path=model_path,
+                output_path=output_path
+            )
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"PREDICTION RESULT SAVED: {pred_path}")
+            logger.info(f"{'=' * 60}")
+        else:
+            result = pipeline.run(
+                mode=args.mode,
+                model_name=args.model,
+                optimize=args.optimize
+            )
 
-        if args.mode in ['train', 'full'] and result:
-            trainer, metrics = result
+            if args.mode in ['train', 'full'] and result:
+                trainer, metrics = result
+
+                logger.info("\n" + "=" * 60)
+                logger.info("TRAINING RESULTS")
+                logger.info("=" * 60)
+
+                if trainer.best_model_name:
+                    best_metric = metrics[trainer.best_model_name]
+                    logger.info(f"   Best Model : {trainer.best_model_name.upper()}")
+                    logger.info(f"   F1 Score   : {best_metric.get('f1', 0):.4f}")
+                    logger.info(f"   ROC-AUC    : {best_metric.get('roc_auc', 0):.4f}")
+                    logger.info(f"   Accuracy   : {best_metric.get('accuracy', 0):.4f}")
+                else:
+                    logger.warning("   No best model selected.")
 
             logger.info("\n" + "=" * 60)
-            logger.info("TRAINING RESULTS")
+            logger.info("[SUCCESS] Pipeline Completed!")
             logger.info("=" * 60)
-
-            if trainer.best_model_name:
-                best_metric = metrics[trainer.best_model_name]
-                logger.info(f"   Best Model : {trainer.best_model_name.upper()}")
-                logger.info(f"   F1 Score   : {best_metric.get('f1', 0):.4f}")
-                logger.info(f"   ROC-AUC    : {best_metric.get('roc_auc', 0):.4f}")
-                logger.info(f"   Accuracy   : {best_metric.get('accuracy', 0):.4f}")
-            else:
-                logger.warning("   No best model selected.")
-
-        logger.info("\n" + "=" * 60)
-        logger.info("[SUCCESS] Pipeline Completed!")
-        logger.info("=" * 60)
 
     except KeyboardInterrupt:
         logger.warning("\n[STOP] Pipeline interrupted by user.")

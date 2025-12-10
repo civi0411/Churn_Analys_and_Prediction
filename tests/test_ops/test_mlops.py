@@ -13,7 +13,7 @@ from src.ops.mlops import (
     ModelMonitor,
     ModelExplainer
 )
-from src.utils import ReportGenerator
+from src.ops import ReportGenerator
 from sklearn.ensemble import RandomForestClassifier
 
 

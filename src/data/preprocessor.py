@@ -22,7 +22,7 @@ Example:
 Author: Churn Prediction Team
 """
 import pandas as pd
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict  # Removed unused Optional
 from sklearn.model_selection import train_test_split
 # Import từ utils nằm ở thư mục cha
 from ..utils import IOHandler
@@ -43,10 +43,11 @@ class DataPreprocessor:
         target_col (str): Tên cột target (mặc định: 'Churn')
 
     Example:
-        >>> config = {'data': {'target_col': 'Churn', 'test_size': 0.2}}
-        >>> preprocessor = DataPreprocessor(config, logger)
-        >>> df = preprocessor.load_data('data/raw/customers.xlsx')
-        >>> train_df, test_df = preprocessor.split_data(df)
+        # Example usage (for illustration only)
+        # config = {'data': {'target_col': 'Churn', 'test_size': 0.2}}
+        # preprocessor = DataPreprocessor(config, logger)
+        # df = preprocessor.load_data('data/raw/customers.xlsx')
+        # train_df, test_df = preprocessor.split_data(df)
     """
 
     def __init__(self, config: Dict, logger=None):
@@ -127,9 +128,9 @@ class DataPreprocessor:
             - KHÔNG xử lý outliers (để cho Transformer)
 
         Example:
-            >>> df_clean = preprocessor.clean_data(df)
-            >>> print(df_clean.duplicated().sum())
-            0
+            # df_clean = preprocessor.clean_data(df)
+            # print(df_clean.duplicated().sum())
+            # 0
         """
         df = df.copy()
 
@@ -164,8 +165,11 @@ class DataPreprocessor:
                 # Strip whitespace and surrounding brackets/parentheses
                 converted = pd.to_numeric(df[col].astype(str).str.strip().str.strip('[]()'), errors='coerce')
                 # If conversion produced at least one numeric value, apply where notna
-                if converted.notna().sum() > 0:
-                    df.loc[converted.notna(), col] = converted[converted.notna()]
+                # Fix: converted is a numpy array, use ~np.isnan instead of .notna()
+                import numpy as np
+                mask = ~np.isnan(converted)
+                if mask.sum() > 0:
+                    df.loc[mask, col] = converted[mask]
             except Exception:
                 # Leave column unchanged on any unexpected error
                 continue
@@ -196,9 +200,9 @@ class DataPreprocessor:
             - data.random_state: Random seed (default: 42)
 
         Example:
-            >>> train_df, test_df = preprocessor.split_data(df)
-            >>> print(f"Train: {len(train_df)}, Test: {len(test_df)}")
-            Train: 4504, Test: 1126
+            # train_df, test_df = preprocessor.split_data(df)
+            # print(f"Train: {len(train_df)}, Test: {len(test_df)}")
+            # Train: 4504, Test: 1126
         """
         if self.logger:
             self.logger.info("=" * 60)

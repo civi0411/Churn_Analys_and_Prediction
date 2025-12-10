@@ -4,19 +4,11 @@
 data:
   target_col: "Churn"
   date_col: "DaySinceLastOrder"
-
-  # Base directory cho data folders
   base_dir: "data"
-
-  # Source data (Đảm bảo file Excel nằm đúng đường dẫn này)
   raw_path: "data/raw/E Commerce Dataset.xlsx"
   sheet_name: "E Comm"
-
-  # Output directories
   processed_dir: "data/processed"
   train_test_dir: "data/train_test"
-
-  # Split configuration
   test_size: 0.2
   random_state: 42
 
@@ -24,10 +16,10 @@ data:
 # OPS
 # ========================
 dataops:
-  versions_dir: "artifacts/versions"  # Nơi lưu lịch sử hash của dữ liệu
+  versions_dir: "artifacts/versions"
 
 mlops:
-  registry_dir: "artifacts/model_registry"  # Nơi lưu model chính thức (Production ready)
+  registry_dir: "artifacts/registry"
 
 # ========================
 # TRACKING & MONITORING
@@ -35,21 +27,14 @@ mlops:
 experiments:
   enabled: true
   base_dir: "artifacts/experiments"
-  experiments_file: "experiments.csv"
 
 monitoring:
   enabled: true
   base_dir: "artifacts/monitoring"
-  performance_log: "performance_log.csv"
   health_check:
-    f1_min: 0.70          # F1 score tối thiểu
-    accuracy_min: 0.75    # Accuracy tối thiểu
-    drift_max: 0.10       # Drift tối đa 10%
-  alerts:
-    enabled: true
-    severity_levels: [ "INFO", "WARNING", "CRITICAL" ]
-    notify_on: [ "drift", "performance_drop" ]
-
+    f1_min: 0.70
+    accuracy_min: 0.75
+    drift_max: 0.10
 
 explainability:
   enabled: true
@@ -60,31 +45,23 @@ explainability:
 # PREPROCESSING CONFIG
 # ========================
 preprocessing:
-  # Stage 1: Clean
   clean:
     remove_duplicates: true
     standardize_values: true
-
-  # Stage 2: Transform
   missing_strategy:
     numerical: "median"
     categorical: "mode"
-
   outlier_method: "iqr"
   outlier_threshold: 1.5
-
   scaler_type: "standard"
   categorical_encoding: "label"
-
   create_features: true
   feature_selection: true
   feature_selection_method: "f_classif"
   n_top_features: 15
-
-  # Config cho SMOTE (Dependency Injection)
   use_smote: true
   k_neighbors: 5
-  use_tomek: true  # Dùng SMOTETomek (kết hợp làm sạch biên)
+  use_tomek: true
 
 # ========================
 # MODEL CONFIGURATIONS
@@ -92,7 +69,7 @@ preprocessing:
 models:
   logistic_regression:
     C: [0.001, 0.01, 0.1, 1, 10]
-    penalty: ["l2"] # l1 đôi khi lỗi với solver mặc định, giữ l2 cho an toàn
+    penalty: ["l2"]
     solver: ["lbfgs", "liblinear"]
     max_iter: [1000]
 
@@ -130,19 +107,14 @@ tuning:
   method: "randomized"
   cv_folds: 5
   cv_strategy: "stratified"
-  n_iter: 20  # Giảm xuống 20 để chạy test nhanh hơn (có thể tăng lên 50 sau)
-  scoring: "f1" # Đổi sang F1-score vì bài toán Churn quan trọng tìm đúng người rời bỏ
+  n_iter: 20
+  scoring: "f1"
   n_jobs: -1
 
 # ========================
-# ARTIFACTS & LOGGING
+# LOGGING (Simplified)
 # ========================
-artifacts:
-  logs_dir: "artifacts/logs"
-  figures_dir: "artifacts/figures"
-  models_dir: "artifacts/models"
-  results_dir: "artifacts/results"
-
 logging:
   level: "INFO"
+  dir: "artifacts/logs"
   format: "[%(asctime)s] | %(levelname)-7s | %(name)-15s | %(message)s"

@@ -15,6 +15,7 @@ Supported Modes:
     - 'preprocess': Chỉ chạy preprocessing
     - 'train': Chỉ chạy training (yêu cầu đã có train/test data)
     - 'visualize': Chỉ chạy visualization
+    - 'predict': Dự đoán trên dữ liệu mới
 
 Architecture:
     Pipeline sử dụng Composition pattern, sở hữu các components:
@@ -139,19 +140,6 @@ class Pipeline:
 
         self.eda_viz.run_full_eda(df, self.target_col)
 
-        # Generate EDA markdown report that will embed the EDA figures under the run dir
-        try:
-            eda_report_path = self.report_generator.generate_eda_report(
-                df,
-                filename=f"eda_report_{self.tracker.current_run_id}",
-                target_col=self.target_col,
-                format='markdown',
-                run_id=self.tracker.current_run_id
-            )
-            self.logger.info(f"EDA Report written to: {eda_report_path}")
-        except Exception as e:
-            self.logger.warning(f"Failed to generate EDA report: {e}")
-
         self.logger.info(f"EDA Completed. Check {self.eda_viz.eda_dir}")
 
         # Build EDA summary for reporting
@@ -170,8 +158,39 @@ class Pipeline:
             summary['top_correlated'] = top_corr
         except Exception:
             summary['top_correlated'] = []
-        summary['resampling'] = 'Đã áp dụng SMOTE/Tomek để cân bằng lại tập huấn luyện.'
+
         return summary
+
+    # Helper method để generate report
+    def _generate_report_for_run(self, mode: str, optimize: bool = False,
+                                 trainer: ModelTrainer = None,
+                                 metrics: Dict = None,
+                                 eda_summary: Dict = None):
+        """Generate report for current run."""
+        try:
+            feature_importance = None
+            best_model_name = None
+
+            if trainer and trainer.best_model_name:
+                best_model_name = trainer.best_model_name
+                feature_importance = trainer.get_feature_importance()
+
+            report_path = self.report_generator.generate_report(
+                run_id=self.tracker.current_run_id,
+                mode=mode,
+                optimize=optimize,
+                best_model_name=best_model_name,
+                all_metrics=metrics,
+                feature_importance=feature_importance,
+                eda_summary=eda_summary,
+                config=self.config
+            )
+
+            if report_path and self.logger:
+                self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Failed to generate report: {e}")
 
     # =========================================================================
     # STAGE 2: PREPROCESSING (Clean -> Split -> Transform)
@@ -429,7 +448,7 @@ class Pipeline:
     # MAIN ENTRY POINT (Run Orchestrator)
     # =========================================================================
     def run(self, mode: str = 'full', model_name: str = 'all',
-            optimize: bool = True) -> Optional[Tuple]:
+            optimize: bool = True, **kwargs) -> Optional[Tuple]:
         """
         Main pipeline execution
         """
@@ -447,10 +466,9 @@ class Pipeline:
             config_snapshot_path = os.path.join(self.tracker.current_run_dir, "config_snapshot.yaml")
             IOHandler.save_yaml(self.config, config_snapshot_path)
 
-            # Redirect Logger to Run Folder. Name per-run log by selected mode (e.g., 'train.log', 'full.log')
+            # Redirect Logger to Run Folder
             run_log_filename = f"{mode.lower()}.log"
             run_log_path = os.path.join(self.tracker.current_run_dir, run_log_filename)
-            # Add per-run handler (captures INFO+ for the run)
             Logger.get_logger('MAIN', run_log_path=run_log_path)
             self.logger.info("✓ Run-specific log initialized")
 
@@ -460,13 +478,11 @@ class Pipeline:
             'test_size': self.config['data']['test_size']
         })
 
-        # Report format: Markdown-first (hard-coded)
-        report_format = 'markdown'
-
         try:
             # ========== MODE: EDA ==========
             if mode == 'eda':
-                self.run_eda()
+                eda_summary = self.run_eda()
+                self._generate_report_for_run(mode, optimize=False, eda_summary=eda_summary)
                 self.tracker.end_run("FINISHED")
                 return None
 
@@ -482,6 +498,7 @@ class Pipeline:
                     shutil.copy2(train_path, os.path.join(data_dir, os.path.basename(train_path)))
                     shutil.copy2(test_path, os.path.join(data_dir, os.path.basename(test_path)))
 
+                self._generate_report_for_run(mode, optimize=False)
                 self.tracker.end_run("FINISHED")
                 return processed_path, train_path, test_path
 
@@ -499,26 +516,11 @@ class Pipeline:
                 # Save Artifacts
                 self._save_training_artifacts(trainer)
 
-                # 2. Visualization (will create evaluation figures inside run dir)
+                # Visualization
                 self.run_visualization(trainer, metrics)
 
-                # Generate Training Report (embed evaluation figures)
-                try:
-                    feature_importance = trainer.get_feature_importance()
-                    report_path = self.report_generator.generate_training_report(
-                        run_id=self.tracker.current_run_id,
-                        best_model_name=trainer.best_model_name,
-                        all_metrics=metrics,
-                        feature_importance=feature_importance,
-                        config=self.config,
-                        format='markdown',
-                        mode=mode,
-                        optimize=optimize,
-                        args=None
-                    )
-                    self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to generate training report: {e}")
+                # Generate Report
+                self._generate_report_for_run(mode, optimize, trainer, metrics)
 
                 # Log metrics
                 if trainer.best_model_name:
@@ -529,7 +531,6 @@ class Pipeline:
 
             # ========== MODE: VISUALIZE ==========
             elif mode == 'visualize':
-                # Quick load & train (no optimization) just to visualize
                 train_test_dir = self.config['data']['train_test_dir']
                 raw_filename = self.config['data']['raw_path']
                 train_path, test_path = get_latest_train_test(train_test_dir, raw_filename)
@@ -539,14 +540,16 @@ class Pipeline:
                 self.run_visualization(trainer, metrics)
 
                 self._save_training_artifacts(trainer)
+                self._generate_report_for_run(mode, False, trainer, metrics)
                 self.tracker.end_run("FINISHED")
                 return None
 
             # ========== MODE: FULL ==========
             elif mode == 'full':
+                # 1. EDA
                 eda_summary = self.run_eda()
 
-                # 1. Preprocess
+                # 2. Preprocess
                 processed_path, train_path, test_path = self.run_preprocessing()
                 if self.tracker.current_run_dir:
                     data_dir = os.path.join(self.tracker.current_run_dir, 'data')
@@ -554,41 +557,34 @@ class Pipeline:
                     shutil.copy2(train_path, os.path.join(data_dir, os.path.basename(train_path)))
                     shutil.copy2(test_path, os.path.join(data_dir, os.path.basename(test_path)))
 
-                # 2. Train
+                # 3. Train
                 trainer, metrics = self.run_training(train_path, test_path, model_name, optimize)
 
-                # 3. Visualize
+                # 4. Visualize
                 self.run_visualization(trainer, metrics)
 
-                # 4. Save & Log
+                # 5. Save & Log
                 self._save_training_artifacts(trainer)
                 if trainer.best_model_name:
                     self.tracker.log_metrics(metrics[trainer.best_model_name])
 
-                # 5. Final Summary
-                self._log_training_summary(trainer, metrics)
+                # 6. Generate Report
+                self._generate_report_for_run(mode, optimize, trainer, metrics, eda_summary)
 
-                # 6. Generate full report (EDA + Training)
-                try:
-                    feature_importance = trainer.get_feature_importance()
-                    report_path = self.report_generator.generate_training_report(
-                        run_id=self.tracker.current_run_id,
-                        best_model_name=trainer.best_model_name,
-                        all_metrics=metrics,
-                        feature_importance=feature_importance,
-                        config=self.config,
-                        format='markdown',
-                        mode=mode,
-                        optimize=optimize,
-                        args=None,
-                        eda_summary=eda_summary
-                    )
-                    self.logger.info(f"Report Generated | {os.path.basename(report_path)}")
-                except Exception as e:
-                    self.logger.warning(f"Failed to generate training report: {e}")
+                # 7. Final Summary
+                self._log_training_summary(trainer, metrics)
 
                 self.tracker.end_run("FINISHED")
                 return trainer, metrics
+
+            # ========== MODE: PREDICT ==========
+            elif mode == 'predict':
+                input_path = kwargs.get('input_path', self.config['data']['raw_path'])
+                model_path = kwargs.get('model_path', None)
+                output_path = kwargs.get('output_path', None)
+                pred_path = self.run_predict(input_path=input_path, model_path=model_path, output_path=output_path)
+                self.tracker.end_run("FINISHED")
+                return pred_path
 
             else:
                 raise ValueError(f"Unknown mode: {mode}")
@@ -598,27 +594,78 @@ class Pipeline:
             self.tracker.end_run("FAILED")
             raise
 
-    def _save_training_artifacts(self, trainer: ModelTrainer):
-        """Helper để lưu model và objects vào run_dir"""
-        if self.tracker.current_run_dir:
-            models_dir = os.path.join(self.tracker.current_run_dir, 'models')
-            ensure_dir(models_dir)
+    def _save_training_artifacts(self, trainer):
+        """Save model artifacts for the current run (placeholder)."""
+        # Example: Save best model, params, etc. to run dir
+        if self.tracker.current_run_dir and trainer.best_model_name:
+            model_dir = os.path.join(self.tracker.current_run_dir, 'models')
+            ensure_dir(model_dir)
+            model_path = os.path.join(model_dir, f"{trainer.best_model_name}.joblib")
+            try:
+                import joblib
+                joblib.dump(trainer.best_model, model_path)
+                self.logger.info(f"Saved model artifact: {model_path}")
+            except Exception as e:
+                self.logger.warning(f"Failed to save model artifact: {e}")
 
-            # Save Transformers (quan trọng để inference sau này)
-            transformer_path = os.path.join(models_dir, "transformer.joblib")
-            IOHandler.save_model(self.transformer, transformer_path)
+    def _log_training_summary(self, trainer, metrics):
+        """Log training summary for the current run (placeholder)."""
+        if trainer.best_model_name:
+            self.logger.info(f"Best Model: {trainer.best_model_name}")
+            self.logger.info(f"Metrics: {metrics.get(trainer.best_model_name, {})}")
 
-            # Save Best Model
-            if trainer.best_model:
-                model_path = os.path.join(models_dir, f"{trainer.best_model_name}.joblib")
-                IOHandler.save_model(trainer.best_model, model_path)
+    def run_predict(self, input_path: str = None, model_path: str = None, output_path: str = None) -> str:
+        """
+        Dự đoán trên dữ liệu mới với model đã huấn luyện.
+        Args:
+            input_path (str): Đường dẫn file dữ liệu đầu vào (csv/xlsx/parquet)
+            model_path (str): Đường dẫn model đã train (.joblib)
+            output_path (str): Đường dẫn file lưu kết quả dự đoán (csv)
+        Returns:
+            str: Đường dẫn file kết quả dự đoán
+        """
+        import pandas as pd
+        self.logger.info("\n" + "=" * 70)
+        self.logger.info("STAGE: PREDICT (INFERENCE)")
+        self.logger.info("=" * 70)
 
-    def _log_training_summary(self, trainer: ModelTrainer, metrics: Dict) -> None:
-        """Log training results summary theo format chuẩn"""
-        self.logger.info("=" * 60)
-        self.logger.info("TRAINING RESULTS")
-        self.logger.info(f"   Best Model: {trainer.best_model_name}")
-        for model_name, model_metrics in metrics.items():
-            self.logger.info(f"   {model_name}: {model_metrics}")
-        self.logger.info("=" * 60)
-        self.logger.info("[SUCCESS] Pipeline Finished.")
+        if input_path is None:
+            input_path = self.config['data']['raw_path']
+        if model_path is None:
+            # Lấy model mới nhất từ registry
+            reg = self.registry
+            model_path = reg.get_latest_model_path() if hasattr(reg, 'get_latest_model_path') else None
+            if not model_path:
+                # fallback: lấy file model mới nhất trong registry dir
+                reg_dir = self.config['mlops']['registry_dir']
+                import glob
+                models = sorted(glob.glob(os.path.join(reg_dir, '*.joblib')))
+                if not models:
+                    raise FileNotFoundError(f"No model found in {reg_dir}")
+                model_path = models[-1]
+        self.logger.info(f"Input data: {input_path}")
+        self.logger.info(f"Model file: {model_path}")
+
+        # 1. Load model
+        model = IOHandler.load_model(model_path)
+
+        # 2. Load & transform input data
+        df = self.preprocessor.load_data(input_path)
+        X, _ = self.transformer.transform(df)
+
+        # 3. Predict
+        y_pred = model.predict(X)
+        y_pred_proba = model.predict_proba(X)[:, 1] if hasattr(model, 'predict_proba') else None
+
+        # 4. Save result
+        result_df = df.copy()
+        result_df['prediction'] = y_pred
+        if y_pred_proba is not None:
+            result_df['probability'] = y_pred_proba
+        if output_path is None:
+            base = os.path.splitext(os.path.basename(input_path))[0]
+            output_path = os.path.join('artifacts', 'predictions', f'{base}_predicted.csv')
+        ensure_dir(os.path.dirname(output_path))
+        result_df.to_csv(output_path, index=False)
+        self.logger.info(f"Prediction saved: {output_path}")
+        return output_path

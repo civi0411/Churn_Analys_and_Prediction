@@ -6,7 +6,7 @@ import os, sys, yaml, json, logging, joblib, pickle, random, glob
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, cast
 import numpy as np
 import pandas as pd
 
@@ -291,6 +291,8 @@ class ConfigLoader:
 
 # ===================== Logger với Filtering =====================
 
+# ===================== Logger với Filtering =====================
+
 class SystemLogFilter:
     """Filter cho System Log - giữ các milestone INFO + WARNING/ERROR"""
 
@@ -305,10 +307,9 @@ class SystemLogFilter:
         if record.levelno == logging.DEBUG:
             return True
 
-        # For INFO level, only allow a small set of milestone messages
+        # For INFO level, only allow important milestone messages
         if record.levelno == logging.INFO:
             important_keywords = [
-                'Report written',
                 'Report Generated',
                 'Model Registry',
                 'SHAP Plot',
@@ -316,6 +317,9 @@ class SystemLogFilter:
                 'Saved:',
                 'TRAINING RESULTS',
                 'BEST MODEL',
+                'STAGE:',
+                'Pipeline',
+                'Completed',
             ]
             try:
                 return any(kw in msg for kw in important_keywords)
@@ -326,14 +330,9 @@ class SystemLogFilter:
 
 
 class RunLogFilter(logging.Filter):
-    """
-    Filter cho Run Log (Dành cho User):
-    - CHỈ ghi INFO (full chi tiết)
-    - KHÔNG ghi WARNING/DEBUG/ERROR (clean)
-    """
+    """Filter cho Run Log - chỉ ghi INFO level cho user"""
 
     def filter(self, record):
-        # Per-run log should capture INFO and above so operators see full run progress
         return record.levelno >= logging.INFO
 
 
@@ -341,71 +340,60 @@ class Logger:
     _loggers: Dict[str, logging.Logger] = {}
 
     @classmethod
-    def get_logger(cls, name: str, log_dir: str = "artifacts/logs",
+    def get_logger(cls, name: str, log_dir: str = None,
                    level: str = "INFO", run_log_path: str = None) -> logging.Logger:
         """
-        Tạo logger với 3 handlers:
-        1. Console: INFO+ (hiển thị mọi thứ)
-        2. System Log: INFO (filtered) + WARNING + ERROR + CRITICAL
-        3. Run Log: CHỈ INFO (clean cho user)
-
-        Args:
-            name: Logger name
-            log_dir: Global log directory
-            level: Log level
-            run_log_path: Path to run-specific log file (optional)
+        Tạo logger với handlers:
+        1. Console: INFO+
+        2. System Log: Filtered INFO + WARNING+
+        3. Run Log: INFO only (clean)
         """
+
+        # Default log_dir from config if available
+        if log_dir is None:
+            log_dir = "artifacts/logs"
 
         # Singleton check
         if name in cls._loggers:
             logger = cls._loggers[name]
-
-            # ✅ NẾU CÓ run_log_path MỚI → THÊM HANDLER
             if run_log_path:
                 cls._add_run_handler(logger, run_log_path)
-
             return logger
 
         ensure_dir(log_dir)
         logger = logging.getLogger(name)
-        logger.setLevel(logging.DEBUG)  # Logger nhận tất cả
+        logger.setLevel(logging.DEBUG)
 
         if logger.hasHandlers():
             logger.handlers.clear()
 
-        # Formatter cho Console và System Log
+        # Formatter
         full_formatter = logging.Formatter(
             "[%(asctime)s] | %(levelname)-7s | %(name)-10s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        # Formatter cho Run Log (bỏ %(name)s - gọn hơn)
         run_formatter = logging.Formatter(
             "[%(asctime)s] | %(levelname)-7s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
-        # ===== HANDLER 1: CONSOLE (INFO+) =====
-        # Console should show normal INFO logs for operators; don't filter console.
+        # === HANDLER 1: CONSOLE ===
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(full_formatter)
         logger.addHandler(console_handler)
 
-        # ===== HANDLER 2: SYSTEM LOG (Filtered INFO + WARNING+) =====
+        # === HANDLER 2: SYSTEM LOG ===
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        # Name system log file with the logger name (MAIN/TEST) so files are identifiable
         global_log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
         global_file_handler = logging.FileHandler(global_log_file, encoding="utf-8")
-        # Capture DEBUG + higher; filter will strip undesired INFO
         global_file_handler.setLevel(logging.DEBUG)
         global_file_handler.setFormatter(full_formatter)
-
-        # ✅ THÊM FILTER: Chỉ ghi milestone INFO + WARNING/ERROR
         global_file_handler.addFilter(SystemLogFilter())
         logger.addHandler(global_file_handler)
 
-        # ===== HANDLER 3: RUN LOG (CHỈ INFO, KHÔNG WARNING) =====
+        # === HANDLER 3: RUN LOG ===
         if run_log_path:
             cls._add_run_handler(logger, run_log_path)
 
@@ -414,7 +402,7 @@ class Logger:
 
     @classmethod
     def _add_run_handler(cls, logger: logging.Logger, run_log_path: str):
-        """Thêm handler cho run-specific log (CHỈ INFO)"""
+        """Thêm handler cho run-specific log"""
         for handler in logger.handlers:
             if isinstance(handler, logging.FileHandler):
                 if handler.baseFilename == os.path.abspath(run_log_path):
@@ -423,7 +411,7 @@ class Logger:
         ensure_dir(os.path.dirname(run_log_path))
 
         run_formatter = logging.Formatter(
-            "[%(asctime)s] | %(levelname)-7s | %(message)s",  # ← ĐÚNG RỒI
+            "[%(asctime)s] | %(levelname)-7s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
 
@@ -541,7 +529,7 @@ class IOHandler:
                 joblib.dump(model, file_path)
             else:  # "pickle"
                 with open(file_path, "wb") as f:
-                    pickle.dump(model, f)
+                    pickle.dump(model, cast(Any, f))
         except Exception as e:
             raise IOError(f"Error saving model to {file_path}: {e}") from e
 
@@ -569,7 +557,7 @@ class IOHandler:
                 return joblib.load(file_path)
             else:  # "pickle"
                 with open(file_path, "rb") as f:
-                    return pickle.load(f)
+                    return pickle.load(cast(Any, f))
         except Exception as e:
             raise IOError(f"Error loading model from {file_path}: {e}") from e
 
@@ -614,18 +602,35 @@ class IOHandler:
             raise IOError(f"Error saving YAML to {file_path}: {e}") from e
 
 
-# Lazy re-exports to avoid circular imports
-def __getattr__(name: str):
-    """
-    Lazily import and expose symbols that live in other modules but are expected
-    to be importable from `src.utils` (backwards-compatibility / test convenience).
+# Public API for `src/utils.py`
+# Keep file as a single module but expose only intended symbols to other modules.
+# Internal helpers should be prefixed with '_' in future changes.
 
-    Currently supports:
-      - ReportGenerator (from src.ops.reporting)
-    """
-    if name == 'ReportGenerator':
-        # Local import to avoid circular import at module import time
-        from .ops.reporting import ReportGenerator as _RG
-        globals()['ReportGenerator'] = _RG
-        return _RG
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__all__ = [
+    "ensure_dir",
+    "set_random_seed",
+    "get_timestamp",
+    "extract_base_filename",
+    "build_processed_filename",
+    "build_split_filenames",
+    "get_latest_train_test",
+    "compute_file_hash",
+    "get_files_in_folder",
+    "filter_files_by_date",
+    "ConfigLoader",
+    "SystemLogFilter",
+    "RunLogFilter",
+    "Logger",
+    "IOHandler",
+]
+
+# NOTE: If import time becomes an issue, move heavy imports (pandas, numpy, joblib, yaml)
+# inside the functions that actually use them (lazy import). This keeps the single-file
+# design but reduces startup cost for CLI/help/quick tasks.
+#
+# Example pattern inside a function:
+# def read_data(...):
+#     import pandas as pd
+#     ...
+#
+# End of utils.py additions.

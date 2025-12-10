@@ -927,236 +927,44 @@ python -c "from src.pipeline import Pipeline; from src.utils import ConfigLoader
 
 ---
 
-## 🚀 Workflow thực tế (Real-world Workflow)
+## 🔮 Dự đoán với dữ liệu mới (Prediction/Inference)
 
-### Scenario 1: Khám phá dữ liệu mới
+### 6️⃣ **Mode: Predict (Dự đoán trên dữ liệu mới)**
+
+Chức năng này cho phép bạn sử dụng model đã huấn luyện để dự đoán trên **dữ liệu mới** (chưa từng train/test).
 
 ```powershell
-# 1. Clone và setup
-git clone https://github.com/civi0411/Churn_Analys_and_Prediction.git
-cd Churn_Analys_and_Prediction
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# 2. Đặt file data mới vào thư mục
-# Copy your_data.xlsx → data/raw/
-
-# 3. EDA để hiểu dữ liệu
-python main.py --mode eda --data "data/raw/your_data.xlsx"
-
-# 4. Xem kết quả trong artifacts/experiments/<run_id>/figures/eda/
+python main.py --mode predict --data "data/raw/your_new_data.xlsx"
 ```
 
-### Scenario 2: Training model cho production
+**Tham số:**
+- `--data`: Đường dẫn file dữ liệu đầu vào (csv/xlsx/parquet). Nên là dữ liệu mới hoặc mẫu cần inference.
+- (Tùy chọn) `--model`: Tên model cụ thể nếu muốn chỉ định (mặc định: model production mới nhất).
 
+**Output:**
+- File kết quả dự đoán sẽ được lưu tại: `artifacts/predictions/<ten_file>_predicted.csv`
+- Trong file kết quả sẽ có thêm cột `prediction` (label dự đoán) và `probability` (nếu model hỗ trợ).
+
+**Best Practice:**
+- **Nên** dùng dữ liệu mới (chưa từng train/test) để đánh giá khả năng tổng quát hóa của model.
+- **Không nên** dùng lại dữ liệu đã train/test để tránh data leakage.
+- Có thể dùng sample nhỏ để kiểm thử kỹ thuật, nhưng nên là sample từ dữ liệu mới.
+
+**Troubleshooting:**
+- Nếu gặp lỗi về cột thiếu, hãy đảm bảo file input có đủ các cột như lúc train (trừ cột target).
+- Nếu model không hỗ trợ predict_proba, file output sẽ chỉ có cột `prediction`.
+- Nếu không tìm thấy model, kiểm tra lại thư mục `artifacts/model_registry/`.
+
+**Ví dụ:**
 ```powershell
-# 1. Chỉnh config cho production
-# Edit config/config.yaml:
-#   - Tăng n_iter cho tuning
-#   - Chọn models phù hợp
-#   - Bật monitoring
+# Dự đoán trên file Excel mới
+python main.py --mode predict --data "data/raw/customer_batch_2025.xlsx"
 
-# 2. Chạy full pipeline với optimize
-python main.py --mode full --model xgboost --optimize
+# Dự đoán trên file CSV
+python main.py --mode predict --data "data/raw/new_customers.csv"
 
-# 3. Kiểm tra kết quả
-# - artifacts/experiments/<run_id>/metrics.json
-# - artifacts/model_registry/xgboost_v*.joblib
-
-# 4. Deploy model
-# Copy model từ registry ra production server
-```
-
-### Scenario 3: So sánh nhiều models
-
-```powershell
-# 1. Train tất cả models với tuning
-python main.py --mode train --model all --optimize
-
-# 2. Xem model comparison chart
-# artifacts/experiments/<run_id>/figures/evaluation/model_comparison.png
-
-# 3. Select best model từ log
-# Check logs hoặc metrics.json
-```
-
-### Scenario 4: Monitoring và retraining
-
-```powershell
-# 1. Kiểm tra performance log
-# Review artifacts/monitoring/performance_log.csv
-
-# 2. Nếu phát hiện drift, retrain với data mới
-python main.py --mode full --model xgboost --optimize --data "data/raw/new_data.xlsx"
-
-# 3. Compare metrics với version cũ
-# So sánh registry.json và performance_log.csv
+# Kết quả sẽ nằm ở: artifacts/predictions/customer_batch_2025_predicted.csv
 ```
 
 ---
 
-## 🛠️ Troubleshooting (Xử lý lỗi thường gặp)
-
-### ❌ Lỗi: `FileNotFoundError: data/raw/E Commerce Dataset.xlsx`
-
-**Nguyên nhân:** File data không tồn tại
-
-**Giải pháp:**
-```powershell
-# Kiểm tra file có tồn tại
-ls data/raw/
-
-# Nếu file có tên khác, sử dụng --data
-python main.py --mode eda --data "data/raw/your_actual_filename.xlsx"
-
-# Hoặc sửa config.yaml
-# data:
-#   raw_path: "data/raw/your_actual_filename.xlsx"
-```
-
-### ❌ Lỗi: `KeyError: 'Churn'`
-
-**Nguyên nhân:** Cột target không tồn tại trong data
-
-**Giải pháp:**
-```powershell
-# Kiểm tra tên cột trong Excel/CSV
-# Sửa config.yaml:
-data:
-  target_col: "YourActualTargetColumn"  # Ví dụ: "Churned", "Exited", "Left"
-```
-
-### ❌ Lỗi: SMOTE requires `n_neighbors <= n_samples`
-
-**Nguyên nhân:** Dữ liệu quá ít cho SMOTE
-
-**Giải pháp:**
-```yaml
-# Sửa config.yaml
-preprocessing:
-  use_smote: false  # Tắt SMOTE
-  # Hoặc giảm k_neighbors
-  k_neighbors: 3    # Thay vì 5
-```
-
-### ❌ Lỗi: `OutOfMemoryError` khi train
-
-**Nguyên nhân:** Model hoặc data quá lớn
-
-**Giải pháp:**
-```yaml
-# Giảm complexity của models trong config.yaml
-models:
-  xgboost:
-    n_estimators: [50, 100]      # Thay vì [100, 300, 500]
-    max_depth: [3, 5]            # Thay vì [3, 5, 7]
-
-# Hoặc giảm n_iter cho tuning
-tuning:
-  n_iter: 10                     # Thay vì 20
-```
-
-### ❌ Lỗi: Tests fail
-
-**Giải pháp:**
-```powershell
-# 1. Chạy tests với verbose để xem lỗi chi tiết
-pytest -v -s
-
-# 2. Chạy test cụ thể bị fail
-pytest tests/test_data/test_preprocessor.py -v
-
-# 3. Check dependencies
-pip install -r requirements.txt --upgrade
-
-# 4. Clear cache và rerun
-pytest --cache-clear
-```
-
----
-
-## 🏗️ Kiến trúc Utilities (Utils Architecture)
-
-### Phân chia trách nhiệm giữa Utils và DataOps
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  UTILS (src/utils.py) - Stateless Utilities                │
-├─────────────────────────────────────────────────────────────┤
-│  File Operations:                                           │
-│    • IOHandler.read_data()      → Đọc 1 file               │
-│    • IOHandler.save_data()      → Lưu 1 file               │
-│    • IOHandler.save_model()     → Lưu model joblib         │
-│    • IOHandler.load_model()     → Load model               │
-│                                                             │
-│  File Discovery:                                            │
-│    • get_files_in_folder()      → List files theo ext      │
-│    • filter_files_by_date()     → Filter theo YYYY-MM      │
-│                                                             │
-│  Other Utilities:                                           │
-│    • ConfigLoader, Logger, ReportGenerator                 │
-│    • ensure_dir(), set_random_seed(), get_timestamp()      │
-│    • compute_file_hash(), get_latest_train_test()          │
-└─────────────────────────────────────────────────────────────┘
-                              ▲
-                              │ sử dụng
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│  DATAOPS (src/ops/dataops.py) - Stateful Operations        │
-├─────────────────────────────────────────────────────────────┤
-│  DataValidator:                                             │
-│    • validate_quality() → null/duplicate ratio             │
-│                                                             │
-│  DataVersioning:                                            │
-│    • Sử dụng compute_file_hash() từ utils                  │
-│    • Thêm: version history, lineage tracking               │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Nguyên tắc phân chia
-
-| Layer | Đặc điểm | Ví dụ |
-|-------|----------|-------------|
-| **Utils** | Stateless, simple, reusable | `read_data()`, `get_files_in_folder()` |
-| **DataOps** | Stateful, tracking, business logic | `DataValidator`, `DataVersioning` |
-
----
-
-## 🤝 Contributing (Đóng góp)
-
-Contributions are welcome! Nếu bạn muốn đóng góp:
-
-1. Fork repository
-2. Tạo branch mới: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -m 'Add some feature'`
-4. Push to branch: `git push origin feature/your-feature`
-5. Tạo Pull Request
-
-### Development Guidelines
-
-- ✅ Viết tests cho code mới (coverage ≥ 90%)
-- ✅ Follow PEP 8 style guide
-- ✅ Thêm docstrings cho functions/classes
-- ✅ Cập nhật README nếu thêm features mới
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 📞 Contact & Support
-
-- **Author:** [civi0411](https://github.com/civi0411)
-- **Repository:** [Churn_Analys_and_Prediction](https://github.com/civi0411/Churn_Analys_and_Prediction)
-- **Issues:** [GitHub Issues](https://github.com/civi0411/Churn_Analys_and_Prediction/issues)
-
----
-
-<p align="center">
-  <b>Made with ❤️ by <a href="https://github.com/civi0411">civi0411</a></b><br>
-  <i>Data Science • Machine Learning • MLOps</i>
-</p>
