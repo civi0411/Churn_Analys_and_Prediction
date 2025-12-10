@@ -102,6 +102,9 @@ class Pipeline:
         self.monitor = ModelMonitor(config['monitoring']['base_dir'])
         # Construct ReportGenerator with named args to avoid argument-order mistakes
         self.report_generator = ReportGenerator(experiments_base_dir=config['experiments']['base_dir'], logger=logger)
+        # <<< BỔ SUNG: KHỞI TẠO ĐƯỜNG DẪN LƯU TRẠNG THÁI TRANSFORMER >>>
+        self.transformer_path = os.path.join(config['mlops']['registry_dir'], 'transformer_state.joblib')
+        # <<< KẾT THÚC BỔ SUNG >>>
 
         # --- 2. SETUP CORE COMPONENTS ---
         # Data
@@ -193,6 +196,18 @@ class Pipeline:
         except Exception as e:
             if self.logger:
                 self.logger.warning(f"Failed to generate report: {e}")
+
+    # Helper method để lưu trạng thái DataTransformer
+    def _save_transformer_state(self) -> str:
+        """Saves the fitted DataTransformer object state."""
+        ensure_dir(os.path.dirname(self.transformer_path))
+        try:
+            IOHandler.save_model(self.transformer, self.transformer_path)
+            self.logger.info(f"Transformer State Saved | {self.transformer_path}")
+            return self.transformer_path
+        except Exception as e:
+            self.logger.error(f"Failed to save DataTransformer state: {e}")
+            raise
 
     # =========================================================================
     # STAGE 2: PREPROCESSING (Clean -> Split -> Transform)
@@ -301,6 +316,9 @@ class Pipeline:
 
         self.logger.info(f"Saved: {train_path} ({train_processed.shape})")
         self.logger.info(f"Saved: {test_path} ({test_processed.shape})")
+        # <<< BỔ SUNG: LƯU TRẠNG THÁI TRANSFORMER >>>
+        self._save_transformer_state()
+        # <<< KẾT THÚC BỔ SUNG >>>
 
         # DataOps: Version tracking for TRAIN/TEST data
         self.versioning.create_version(
@@ -643,6 +661,17 @@ class Pipeline:
         """
         self.logger.info("=" * 70)
         self.logger.info("STAGE: PREDICT")
+        # <<< BỔ SUNG: TẢI TRẠNG THÁI TRANSFORMER >>>
+        try:
+            self.transformer = IOHandler.load_model(self.transformer_path)
+            self.logger.info(f"Transformer State Loaded | {self.transformer_path}")
+        except FileNotFoundError:
+            self.logger.error("Transformer state file not found. Have you run 'python main.py --mode full' hoặc '--mode preprocess' trước để lưu state?")
+            raise
+        except Exception as e:
+            self.logger.error(f"Error loading transformer state: {e}")
+            raise
+        # <<< KẾT THÚC BỔ SUNG >>>
 
         # 1. Check input_path
         if not input_path or not os.path.exists(input_path):
@@ -689,10 +718,6 @@ class Pipeline:
                 self.logger.warning(f"Drift check failed: {e}")
 
         # 6. Transform & Predict
-        # Check if encoder is available for categorical columns
-        if not self.transformer._learned_params['encoders']:
-            self.logger.error("No encoder found for categorical columns. Please train the pipeline first or use preprocessed data for prediction.")
-            raise RuntimeError("No encoder found for categorical columns. Please train the pipeline first or use preprocessed data for prediction.")
         X, _ = self.transformer.transform(df)
         model = IOHandler.load_model(model_path)
         y_pred = model.predict(X)

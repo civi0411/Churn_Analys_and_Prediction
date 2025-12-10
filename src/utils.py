@@ -442,31 +442,30 @@ class IOHandler:
             ValueError: If file extension is not supported.
             IOError: For IO or parsing errors.
         """
-        ext = Path(file_path).suffix.lower()
-
-        if ext not in IOHandler._SUPPORTED_EXT:
-            raise ValueError(
-                f"Unsupported file format: {ext}. "
-                f"Supported formats: {', '.join(sorted(IOHandler._SUPPORTED_EXT))}"
-            )
-
-        try:
-            if ext == ".csv":
-                return pd.read_csv(file_path, **kwargs)
-            elif ext in {".xlsx", ".xls"}:
-                return pd.read_excel(file_path, **kwargs)
-            elif ext == ".json":
-                try:
-                    return pd.read_json(file_path, orient='records', **kwargs)
-                except ValueError:
-                    return pd.read_json(file_path, **kwargs)
-            elif ext == ".parquet":
-                return pd.read_parquet(file_path, **kwargs)
-
-        except (ValueError, TypeError) as e:
-            raise IOError(f"Error reading file {file_path}: {e}") from e
-
-        raise RuntimeError(f"Unhandled file format or error with extension: {ext}")
+        import pandas as pd
+        import os
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        ext = os.path.splitext(file_path)[-1].lower()
+        if ext in ['.xlsx', '.xls']:
+            sheet_name = kwargs.get('sheet_name', None)
+            try:
+                if sheet_name is not None:
+                    try:
+                        return pd.read_excel(file_path, sheet_name=sheet_name)
+                    except Exception:
+                        # Nếu sheet_name không tồn tại, đọc sheet đầu tiên
+                        return pd.read_excel(file_path, sheet_name=0)
+                else:
+                    return pd.read_excel(file_path, sheet_name=0)
+            except Exception as e:
+                raise IOError(f"Error reading file {file_path}: {e}") from e
+        elif ext == '.csv':
+            return pd.read_csv(file_path)
+        elif ext == '.parquet':
+            return pd.read_parquet(file_path)
+        else:
+            raise ValueError(f"Unsupported file extension: {ext}")
 
     # NOTE: Multiple-file ingestion (multi-file / folder-based loaders) removed; use IOHandler.read_data for single-file ingestion
 
