@@ -61,9 +61,15 @@ class EDAVisualizer:
         """
         self.config = config
         self.logger = logger
-        self.save_dir = run_specific_dir or config.get('artifacts', {}).get('figures_dir', 'artifacts/figures')
-        self.eda_dir = os.path.join(self.save_dir, 'eda')
-        ensure_dir(self.eda_dir)
+        if run_specific_dir is None:
+            self.save_dir = None
+            self.eda_dir = None
+            if self.logger:
+                self.logger.warning("EDAVisualizer: run_specific_dir not set, no figures will be saved.")
+        else:
+            self.save_dir = run_specific_dir
+            self.eda_dir = os.path.join(self.save_dir, 'eda')
+            ensure_dir(self.eda_dir)
 
         sns.set_palette("muted")
         sns.set_style("whitegrid")
@@ -71,6 +77,10 @@ class EDAVisualizer:
 
     def _save_plot(self, fig, filename: str):
         """Lưu figure và log."""
+        if not self.eda_dir:
+            if self.logger:
+                self.logger.warning(f"EDAVisualizer: eda_dir not set, cannot save {filename}")
+            return
         path = os.path.join(self.eda_dir, filename)
         fig.savefig(path, bbox_inches='tight', dpi=300)
         plt.close(fig)
@@ -361,4 +371,3 @@ class EDAVisualizer:
 
         if self.logger:
             self.logger.info(f"EDA Complete   | {self.eda_dir}")
-

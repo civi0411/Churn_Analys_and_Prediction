@@ -24,7 +24,9 @@ dataops:
     abort_on_critical: true          # Hủy prediction nếu CRITICAL drift
     sample_frac: 1.0                 # Tỷ lệ sample dữ liệu (1.0 = 100%)
     max_rows: null                   # Giới hạn số dòng check (null = không giới hạn)
-    reports_dir: "artifacts/reports/drift"  # Thư mục lưu báo cáo
+  business_rules:
+    persist: true
+    fail_on_violation: false
 
 mlops:
   registry_dir: "artifacts/registry"

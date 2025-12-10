@@ -1,4 +1,3 @@
-import pytest
+# File này đã được xác định là dư thừa và không còn giá trị sử dụng.
+# Đã được xóa khỏi hệ thống test.
 
-# Temporary/legacy file - intentionally skipped
-pytest.skip("tmp_report_test.py is a legacy placeholder; tests implemented elsewhere", allow_module_level=True)

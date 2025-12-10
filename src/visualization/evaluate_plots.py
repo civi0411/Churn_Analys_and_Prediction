@@ -69,10 +69,15 @@ class EvaluateVisualizer:
         """
         self.config = config
         self.logger = logger
-        self.save_dir = run_specific_dir or config.get('artifacts', {}).get('figures_dir', 'artifacts/figures')
-        self.eval_dir = os.path.join(self.save_dir, 'evaluation')
-        ensure_dir(self.eval_dir)
-
+        if run_specific_dir is None:
+            self.save_dir = None
+            self.eval_dir = None
+            if self.logger:
+                self.logger.warning("EvaluateVisualizer: run_specific_dir not set, no figures will be saved.")
+        else:
+            self.save_dir = run_specific_dir
+            self.eval_dir = os.path.join(self.save_dir, 'evaluation')
+            ensure_dir(self.eval_dir)
         sns.set_style("whitegrid")
 
     def _save_plot(self, fig, filename: str):
@@ -83,11 +88,15 @@ class EvaluateVisualizer:
             fig: Matplotlib figure
             filename (str): Tên file (sẽ lưu vào eval_dir)
         """
+        if not self.eval_dir:
+            if self.logger:
+                self.logger.warning(f"EvaluateVisualizer: eval_dir not set, cannot save {filename}")
+            return
         path = os.path.join(self.eval_dir, filename)
         fig.savefig(path, bbox_inches='tight', dpi=300)
         plt.close(fig)
         if self.logger:
-            self.logger.info(f"Saved Plot      | EVALUATION | {filename}")
+            self.logger.info(f"Saved Plot      | EVAL       | {filename}")
 
     def plot_confusion_matrix(self, y_true, y_pred, model_name: str):
         """

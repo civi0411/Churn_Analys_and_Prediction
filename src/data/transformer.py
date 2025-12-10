@@ -88,6 +88,8 @@ class DataTransformer:
             logger: Logger instance (optional)
         """
         self.config = config
+        # Preprocessing-specific config (shorthand)
+        self.pp = config.get('preprocessing', {}) if isinstance(config, dict) else {}
         self.logger = logger
         self.target_col = config.get('data', {}).get('target_col', 'Churn')
 
@@ -248,7 +250,7 @@ class DataTransformer:
         Returns:
             pd.DataFrame: DataFrame đã impute missing values
         """
-        missing_cfg = self.config.get('missing_strategy', {})
+        missing_cfg = self.pp.get('missing_strategy', {})
 
         # Numerical
         num_strat = missing_cfg.get('numerical', 'median')
@@ -301,7 +303,7 @@ class DataTransformer:
         Config:
             preprocessing.create_features: Bật/tắt feature engineering
         """
-        if not self.config.get('create_features', False):
+        if not self.pp.get('create_features', False):
             return df
 
         # Các feature logic từ file cũ của bạn
@@ -354,8 +356,8 @@ class DataTransformer:
             preprocessing.outlier_method: 'iqr' (chỉ hỗ trợ IQR)
             preprocessing.outlier_threshold: Hệ số IQR (default: 1.5)
         """
-        method = self.config.get('outlier_method', 'iqr')
-        threshold = self.config.get('outlier_threshold', 1.5)
+        method = self.pp.get('outlier_method', 'iqr')
+        threshold = self.pp.get('outlier_threshold', 1.5)
 
         # Chỉ hỗ trợ IQR cho pipeline production an toàn (các method khác như IsolationForest thường dùng filter dòng, khó áp dụng transform)
         if method == 'iqr':
@@ -392,7 +394,7 @@ class DataTransformer:
         Config:
             preprocessing.categorical_encoding: 'label' (chỉ hỗ trợ label encoding)
         """
-        encoding_method = self.config.get('categorical_encoding', 'label')
+        encoding_method = self.pp.get('categorical_encoding', 'label')
 
         if encoding_method == 'label':
             for col in self.categorical_cols:
@@ -430,7 +432,7 @@ class DataTransformer:
         cols = [c for c in self.numerical_cols if c in df.columns]
         if not cols: return df
 
-        scaler_type = self.config.get('scaler_type', 'standard')
+        scaler_type = self.pp.get('scaler_type', 'standard')
 
         if is_training:
             if scaler_type == 'minmax':
@@ -471,13 +473,21 @@ class DataTransformer:
             Method này CHỈ chạy trong training. Test data sẽ dùng
             danh sách features đã được chọn từ training.
         """
-        if not self.config.get('feature_selection', False):
+        # Remove constant columns (all values identical)
+        nunique = X.nunique()
+        constant_cols = nunique[nunique <= 1].index.tolist()
+        if constant_cols:
+            if self.logger:
+                self.logger.info(f"Feature Select | Dropping constant columns: {constant_cols}")
+            X = X.drop(columns=constant_cols)
+
+        if not self.pp.get('feature_selection', False):
             return X, list(X.columns)
 
-        k = self.config.get('n_top_features', 15)
+        k = self.pp.get('n_top_features', 15)
         k = min(k, X.shape[1])
 
-        method = self.config.get('feature_selection_method', 'f_classif')
+        method = self.pp.get('feature_selection_method', 'f_classif')
         score_func = mutual_info_classif if method == 'mutual_info' else f_classif
 
         selector = SelectKBest(score_func=score_func, k=k)
@@ -515,7 +525,7 @@ class DataTransformer:
             >>> if resampler:
             ...     X_resampled, y_resampled = resampler.fit_resample(X_train, y_train)
         """
-        if not self.config.get('preprocessing', {}).get('use_smote', False):
+        if not self.pp.get('use_smote', False):
             return None
 
         if not IMBLEARN_AVAILABLE:
@@ -523,8 +533,8 @@ class DataTransformer:
                 self.logger.warning("Imblearn not installed. Skipping SMOTE.")
             return None
 
-        k = self.config.get('preprocessing', {}).get('k_neighbors', 5)
-        use_tomek = self.config.get('preprocessing', {}).get('use_tomek', False)
+        k = self.pp.get('k_neighbors', 5)
+        use_tomek = self.pp.get('use_tomek', False)
 
         if use_tomek:
             resampler = SMOTETomek(random_state=42, smote=SMOTE(k_neighbors=k))

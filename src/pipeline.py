@@ -90,6 +90,8 @@ class Pipeline:
         self.config = config
         self.logger = logger
         self.target_col = config['data']['target_col']
+        self.train_raw_path = config['data']['raw_path']  # Lưu lại file raw gốc
+
 
         # Set Global Seed
         set_random_seed(config['data'].get('random_state', 42))
@@ -102,9 +104,8 @@ class Pipeline:
         self.monitor = ModelMonitor(config['monitoring']['base_dir'])
         # Construct ReportGenerator with named args to avoid argument-order mistakes
         self.report_generator = ReportGenerator(experiments_base_dir=config['experiments']['base_dir'], logger=logger)
-        # <<< BỔ SUNG: KHỞI TẠO ĐƯỜNG DẪN LƯU TRẠNG THÁI TRANSFORMER >>>
+        # KHỞI TẠO ĐƯỜNG DẪN LƯU TRẠNG THÁI TRANSFORMER
         self.transformer_path = os.path.join(config['mlops']['registry_dir'], 'transformer_state.joblib')
-        # <<< KẾT THÚC BỔ SUNG >>>
 
         # --- 2. SETUP CORE COMPONENTS ---
         # Data
@@ -649,29 +650,24 @@ class Pipeline:
             self.logger.info(f"Best Model: {trainer.best_model_name}")
             self.logger.info(f"Metrics: {metrics.get(trainer.best_model_name, {})}")
 
-    def run_predict(self, input_path: str = None,
-                    model_path: str = None,
-                    output_path: str = None,
-                    check_drift: bool = True,  # ← NEW
-                    drift_threshold: float = 0.05,  # ← NEW
-                    abort_on_critical: bool = True  # ← NEW
-                    ) -> str:
+    def run_predict(self, input_path: str = None, model_path: str = None, output_path: str = None, transformer_path: str = None) -> str:
         """
         Predict with optional drift detection.
         """
         self.logger.info("=" * 70)
         self.logger.info("STAGE: PREDICT")
-        # <<< BỔ SUNG: TẢI TRẠNG THÁI TRANSFORMER >>>
+
+        if transformer_path is None:
+            transformer_path = os.path.join(self.config['mlops']['registry_dir'], 'transformer_state.joblib')
         try:
-            self.transformer = IOHandler.load_model(self.transformer_path)
-            self.logger.info(f"Transformer State Loaded | {self.transformer_path}")
+            self.transformer = IOHandler.load_model(transformer_path)
+            self.logger.info(f"Transformer State Loaded | {transformer_path}")
         except FileNotFoundError:
-            self.logger.error("Transformer state file not found. Have you run 'python main.py --mode full' hoặc '--mode preprocess' trước để lưu state?")
+            self.logger.error(f"Transformer state file not found: {transformer_path}. Have you run 'python main.py --mode full' hoặc '--mode preprocess' trước để lưu state?")
             raise
         except Exception as e:
             self.logger.error(f"Error loading transformer state: {e}")
             raise
-        # <<< KẾT THÚC BỔ SUNG >>>
 
         # 1. Check input_path
         if not input_path or not os.path.exists(input_path):
@@ -694,36 +690,48 @@ class Pipeline:
         # 3. Load
         df = self.preprocessor.load_data(input_path)
 
+        # 1. CLEAN DATA TRƯỚC (giống như training)
+        df_clean = self.preprocessor.clean_data(df)
+
         # 4. Business Validation
-        br_report = self.validator.validate_business_rules(df)
+        br_report = self.validator.validate_business_rules(df_clean)
         if not br_report['passed']:
             self.logger.warning("Business rule violations detected")
 
-        # 5. DRIFT CHECK (Optional)
-        if check_drift:
-            try:
-                train_test_dir = self.config['data']['train_test_dir']
-                raw_filename = self.config['data']['raw_path']
-                train_path, _ = get_latest_train_test(train_test_dir, raw_filename)
-                df_train = IOHandler.read_data(train_path)
-                detector = DataDriftDetector(df_train, self.logger)
-                report = detector.detect_drift(df, threshold=drift_threshold)
-                severity = report['summary']['drift_severity']
-                if severity == 'CRITICAL' and abort_on_critical:
-                    self.logger.error("CRITICAL DRIFT - Aborting prediction!")
-                    return None
-                elif severity in ['MODERATE', 'LOW']:
-                    self.logger.warning(f"{severity} drift detected")
-            except Exception as e:
-                self.logger.warning(f"Drift check failed: {e}")
+        # 5. DRIFT CHECK
+        drift_config = self.config.get('dataops', {}).get('drift_detection', {})
+        if drift_config.get('enabled', True):
+            from .ops.dataops.drift_detector import DataDriftDetector
+            processed_dir = self.config['data']['processed_dir']
+            train_raw_base = os.path.splitext(os.path.basename(self.train_raw_path))[0]  # Dùng file raw gốc
+            cleaned_train_path = os.path.join(processed_dir, f"{train_raw_base}_cleaned.parquet")
+            cleaned_train_path = os.path.normpath(cleaned_train_path)
+            if not os.path.exists(cleaned_train_path):
+                self.logger.error(f"Cleaned train data file not found for drift check: {cleaned_train_path}")
+                raise FileNotFoundError(f"Cleaned train data file not found: {cleaned_train_path}")
+            df_train_cleaned = IOHandler.read_data(cleaned_train_path)
+            # Chuẩn hóa kiểu dữ liệu trước khi drift check
+            df_train_cleaned = self._prepare_drift_data(df_train_cleaned)
+            df_clean_drift = self._prepare_drift_data(df_clean)
+            detector = DataDriftDetector(df_train_cleaned, self.logger)
+            report = detector.detect_drift(
+                df_clean_drift,
+                threshold=drift_config.get('pvalue_threshold', 0.05)
+            )
+            severity = report['summary']['drift_severity']
+            if severity == 'CRITICAL' and drift_config.get('abort_on_critical', True):
+                self.logger.error("CRITICAL DRIFT DETECTED - Aborting prediction")
+                return None
+            # Save drift report
+            detector.save_report(report, drift_config.get('reports_dir'))
 
         # 6. Transform & Predict
-        X, _ = self.transformer.transform(df)
+        X, _ = self.transformer.transform(df_clean)
         model = IOHandler.load_model(model_path)
         y_pred = model.predict(X)
 
         # 7. Save
-        result_df = df.copy()
+        result_df = df_clean.copy()
         result_df['prediction'] = y_pred
         if output_path is None:
             base = os.path.splitext(os.path.basename(input_path))[0]
@@ -732,4 +740,30 @@ class Pipeline:
         result_df.to_csv(output_path, index=False)
         self.logger.info(f"Prediction saved: {output_path}")
         return output_path
+
+    def _prepare_drift_data(self, df):
+        """
+        Đảm bảo phân loại cột numeric/categorical đúng chuẩn trước khi drift check.
+        Nếu cột object nhưng toàn số, ép kiểu về numeric.
+        Nếu cột numeric nhưng có giá trị không chuyển được, log warning và bỏ qua cột đó khi drift check.
+        """
+        import numpy as np
+        import pandas as pd
+        df = df.copy()
+        for col in df.columns:
+            # Nếu là object nhưng toàn số, ép về float
+            if df[col].dtype == 'object':
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='raise')
+                except Exception:
+                    pass  # Nếu không chuyển được thì giữ nguyên
+            # Nếu là numeric nhưng có giá trị không hợp lệ, log warning
+            elif np.issubdtype(df[col].dtype, np.number):
+                try:
+                    _ = pd.to_numeric(df[col], errors='raise')
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"[Drift] Numeric column '{col}' contains non-numeric values: {e}. Will skip this column in drift check.")
+                    df.drop(columns=[col], inplace=True)
+        return df
 

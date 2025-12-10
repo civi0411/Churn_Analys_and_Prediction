@@ -204,58 +204,80 @@ class DataDriftDetector:
 
     def _detect_categorical_drift(self, new_data: pd.DataFrame, threshold: float) -> Dict:
         """
-        Chi-square test cho categorical features
+        Chi-square test cho categorical features, bỏ qua cột có quá nhiều unique hoặc chuỗi dài bất thường.
+        Không warning/exception ngoài logger, không ép kiểu, không chi-squared với dữ liệu không phù hợp.
         """
         results: Dict[str, Any] = {}
         drifted = []
-
+        MAX_UNIQUE = 50  # Nếu unique > 50 thì bỏ qua drift check cho cột đó
+        MAX_STRLEN = 200  # Nếu giá trị chuỗi quá dài thì bỏ qua
         for col, ref_stat in self.ref_stats['categorical'].items():
             if col not in new_data.columns:
                 continue
-
+            # Nếu số lượng unique quá lớn, bỏ qua
+            n_unique = len(set(self.reference_data[col].dropna().unique()) | set(new_data[col].dropna().unique()))
+            if n_unique > MAX_UNIQUE:
+                if self.logger:
+                    self.logger.info(f"[Drift] Column '{col}' skipped: too many unique values ({n_unique} > {MAX_UNIQUE})")
+                results[col] = {
+                    'skipped': True,
+                    'reason': f"Too many unique values: {n_unique}"
+                }
+                continue
+            # Nếu giá trị là chuỗi rất dài (có thể là lỗi dữ liệu), bỏ qua
+            try:
+                sample_val = str(self.reference_data[col].dropna().iloc[0]) if not self.reference_data[col].dropna().empty else ''
+                if len(sample_val) > MAX_STRLEN:
+                    if self.logger:
+                        self.logger.info(f"[Drift] Column '{col}' skipped: value too long ({len(sample_val)} chars > {MAX_STRLEN})")
+                    results[col] = {
+                        'skipped': True,
+                        'reason': f"Value too long: {len(sample_val)} chars"
+                    }
+                    continue
+            except Exception:
+                if self.logger:
+                    self.logger.info(f"[Drift] Column '{col}' skipped: error when checking value length.")
+                results[col] = {
+                    'skipped': True,
+                    'reason': "Error when checking value length"
+                }
+                continue
             ref_counts = self.reference_data[col].value_counts()
             new_counts = new_data[col].value_counts()
-
             # Check for new categories
             ref_cats = ref_stat.get('unique_values', set())
             new_cats = set(new_data[col].dropna().unique())
             new_categories = list(new_cats - ref_cats)
-
             # Align categories for chi-square
             all_cats = list(ref_cats | new_cats)
             ref_freq = [ref_counts.get(cat, 0) for cat in all_cats]
             new_freq = [new_counts.get(cat, 0) for cat in all_cats]
-
             # Build contingency table: rows = [ref_counts, new_counts]
             try:
-                # convert to int arrays
                 ref_arr = [int(x) for x in ref_freq]
                 new_arr = [int(x) for x in new_freq]
                 table = np.array([ref_arr, new_arr])
-
-                # If all zeros or degenerate, skip chi2 and only check new categories
                 if table.sum() == 0:
                     chi2_stat, p_value = None, None
                     has_chi2_drift = False
                 else:
                     chi2_stat, p_value, dof, expected = chi2_contingency(table)
                     has_chi2_drift = (p_value is not None and p_value < threshold)
-
                 has_drift = has_chi2_drift or (len(new_categories) > 0)
-            except Exception:
+            except Exception as e:
+                if self.logger:
+                    self.logger.info(f"[Drift] Column '{col}' skipped: chi2 test failed ({e})")
                 chi2_stat, p_value = None, None
                 has_drift = len(new_categories) > 0
-
             results[col] = {
                 'chi2_statistic': float(chi2_stat) if chi2_stat is not None else None,
                 'p_value': float(p_value) if p_value is not None else None,
                 'new_categories': new_categories,
                 'has_drift': has_drift
             }
-
             if has_drift:
                 drifted.append(col)
-
         return {
             'chi2_results': results,
             'drifted_features': drifted
@@ -340,3 +362,18 @@ class DataDriftDetector:
 
         return json_path, md_path
 
+def detect_drift_full(df_train, df_predict, logger=None, threshold=0.05, report_path=None):
+    """
+    Hàm drift detection tổng hợp cho cả numeric và categorical, tổng hợp severity, lưu report nếu cần.
+    """
+    detector = DataDriftDetector(df_train, logger)
+    report = detector.detect_drift(df_predict, threshold=threshold)
+    # Lưu report nếu có report_path
+    if report_path:
+        ensure_dir(os.path.dirname(report_path))
+        import json
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+        if logger:
+            logger.info(f"Drift report saved: {report_path}")
+    return report
