@@ -17,6 +17,14 @@ data:
 # ========================
 dataops:
   versions_dir: "artifacts/versions"
+  # Business rules validation options
+  business_rules:
+    # If true, pipeline will raise an error and abort when violations are found
+    fail_on_violation: false
+    # Persist business rules report into run folder (recommended)
+    persist: true
+    # Mask PII in persisted report (not implemented fully yet; reserved)
+    mask_pii: true
 
 mlops:
   registry_dir: "artifacts/registry"

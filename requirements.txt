@@ -34,5 +34,8 @@ typing-extensions>=4.7.1 # Hỗ trợ Type Hinting
 pytest>=9.0.0
 pytest-cov>=7.0.0
 
+# Statistical tests for drift detection
+scipy>=1.11.0
+
 # Note: PDF export is optional and not enabled by default. If you need PDF conversion,
 # install e.g. weasyprint or pdfkit separately in your environment.
