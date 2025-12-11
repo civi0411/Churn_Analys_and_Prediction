@@ -1,10 +1,5 @@
 # Customer Churn Analysis & Prediction
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-orange.svg)
-![XGBoost](https://img.shields.io/badge/XGBoost-2.0+-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-
 ## Overview
 
 Dự án này không chỉ là một bài toán phân loại Machine Learning thông thường. Đây là một hệ thống Software Engineering for Data Science hoàn chỉnh, giải quyết bài toán dự đoán khách hàng rời bỏ (Customer Churn) cho lĩnh vực Thương mại điện tử (E-Commerce).
@@ -248,152 +243,83 @@ graph TB
 
 ---
 
-## 📁 Cấu trúc thư mục (Project Structure)
+## 📂 Project Structure
 
-```
-📦 Churn_Analys_and_Prediction/
+```text
+Churn_Analys_and_Prediction/
 │
+├── 📄 .gitignore                        # 🚫 Git ignore rules
 ├── 📄 main.py                           # 🚪 Entry point chính - CLI interface
-├── 📄 README.md                         # 📖 Documentation (file này)
+├── 📄 README.md                         # 📖 Project documentation
 ├── 📄 requirements.txt                  # 📦 Python dependencies
 │
 ├── 📂 config/                           # ⚙️ CẤU HÌNH
-│   └── 📄 config.yaml                   # File cấu hình tập trung (paths, models, tuning params)
+│   └── 📄 config.yaml                   # File cấu hình tập trung (paths, models, params)
+│
+├── 📂 notebook/                         # 📓 JUPYTER NOTEBOOKS
+│   └── 📄 demo_pipeline.ipynb           # Demo luồng chạy của pipeline
 │
 ├── 📂 src/                              # 💻 MÃ NGUỒN CHÍNH
 │   ├── 📄 __init__.py
 │   ├── 📄 pipeline.py                   # 🔄 Orchestrator - điều phối toàn bộ pipeline
-│   ├── 📄 utils.py                      # 🛠️ Utilities: Logger, IOHandler, ConfigLoader,
-│   │                                    #    get_files_in_folder(), filter_files_by_date()
+│   ├── 📄 utils.py                      # 🛠️ Utilities (Logger, IO, ConfigLoader)
 │   │
-│   ├── 📂 data/                         # 📊 MODULE XỬ LÝ DỮ LIỆU
+│   ├── 📂 data/                         # 📊 DATA PROCESSING MODULE
 │   │   ├── 📄 __init__.py
 │   │   ├── 📄 preprocessor.py           # Giai đoạn 1: Load, Clean, Split (Stateless)
-│   │   └── 📄 transformer.py            # Giai đoạn 2: Transform, Feature Engineering (Stateful)
+│   │   └── 📄 transformer.py            # Giai đoạn 2: Transform, Feature Eng (Stateful)
 │   │
-│   ├── 📂 models/                       # 🤖 MODULE MÔ HÌNH
+│   ├── 📂 models/                       # 🤖 MODEL TRAINING MODULE
 │   │   ├── 📄 __init__.py
-│   │   ├── 📄 trainer.py                # Train models, evaluate, select best
-│   │   ├── 📄 optimizer.py              # Hyperparameter tuning (RandomizedSearch)
-│   │   └── 📄 evaluator.py              # Metrics calculation, evaluation logic
+│   │   ├── 📄 trainer.py                # Train logic, model selection
+│   │   ├── 📄 optimizer.py              # Hyperparameter tuning
+│   │   └── 📄 evaluator.py              # Metrics calculation logic
 │   │
-│   ├── 📂 ops/                          # ⚡ MODULE DATAOPS + MLOPS
+│   ├── 📂 ops/                          # ⚡ MLOPS & DATAOPS MODULE
 │   │   ├── 📄 __init__.py
-│   │   ├── 📄 dataops.py                # DataValidator, DataVersioning
-│   │   └── 📄 mlops.py                  # ExperimentTracker, ModelRegistry, Monitor, Explainer
-│   │
-│   └── 📂 visualization/                # 📈 MODULE VISUALIZATION
-│       ├── 📄 __init__.py
-│       ├── 📄 eda_plots.py              # EDA visualizations (missing, correlation, distribution)
-│       └── 📄 evaluate_plots.py         # Model evaluation plots (confusion matrix, ROC, feature importance)
-│
-├── 📂 data/                             # 💾 DỮ LIỆU LÀM VIỆC (WORKSPACE)
-│   ├── 📂 raw/                          # Dữ liệu thô gốc
-│   │   └── 📄 E Commerce Dataset.xlsx   # File Excel input chính
-│   │
-│   ├── 📂 processed/                    # Dữ liệu đã clean (intermediate)
-│   │   └── 📄 E Commerce Dataset_cleaned.parquet
-│   │
-│   └── 📂 train_test/                   # Dữ liệu đã split và transform (ready for training)
-│       ├── 📄 E Commerce Dataset_train.parquet
-│       └── 📄 E Commerce Dataset_test.parquet
-│
-├── 📂 artifacts/                        # 🗄️ OUTPUTS & ARCHIVE
-│   │
-│   ├── 📂 experiments/                  # 🔬 EXPERIMENT TRACKING
-│   │   ├── 📄 experiments.csv           # Master log của tất cả runs
 │   │   │
-│   │   └── 📂 <run_id>/                 # VD: 20251207_153322_FULL/
-│   │       ├── 📄 config_snapshot.yaml  # Snapshot cấu hình của run này
-│   │       ├── 📄 params.json           # Hyperparameters đã sử dụng
-│   │       ├── 📄 metrics.json          # Kết quả metrics (F1, AUC, Precision, Recall...)
-│   │       ├── 📄 run.log               # Log chi tiết của run
-│   │       │
-│   │       ├── 📂 data/                 # Data snapshots
-│   │       │   ├── 📄 train.parquet     # Train set đã transform
-│   │       │   └── 📄 test.parquet      # Test set đã transform
-│   │       │
-│   │       ├── 📂 models/               # Models artifacts
-│   │       │   ├── 📄 transformer.joblib    # DataTransformer (cần cho inference!)
-│   │       │   └── 📄 xgboost.joblib        # Best model của run
-│   │       │
-│   │       └── 📂 figures/              # Visualizations
-│   │           ├── 📂 eda/              # EDA plots (missing, correlation, distribution)
-│   │           │   ├── 📄 missing_values.png
-│   │           │   ├── 📄 correlation_matrix.png
-│   │           │   └── 📄 numerical_distributions.png
-│   │           │
-│   │           └── 📂 evaluation/       # Model evaluation plots
-│   │               ├── 📄 confusion_matrix_xgboost.png
-│   │               ├── 📄 roc_curve.png
-│   │               ├── 📄 feature_importance.png
-│   │               ├── 📄 model_comparison.png
-│   │               └── 📄 shap_summary.png
+│   │   ├── 📂 dataops/                  # Data Operations
+│   │   │   ├── 📄 drift_detector.py     # Phát hiện trôi dạt dữ liệu (Data Drift)
+│   │   │   ├── 📄 validator.py          # Kiểm tra chất lượng dữ liệu (Schema/Values)
+│   │   │   └── 📄 versioning.py         # Quản lý phiên bản dữ liệu
+│   │   │
+│   │   ├── 📂 mlops/                    # ML Operations
+│   │   │   ├── 📄 explainer.py          # Model Interpretability (SHAP/LIME)
+│   │   │   ├── 📄 monitoring.py         # Theo dõi hiệu năng model
+│   │   │   ├── 📄 registry.py           # Quản lý, lưu/tải model artifacts
+│   │   │   └── 📄 tracking.py           # Experiment tracking
+│   │   │
+│   │   └── 📂 report/                   # Reporting
+│   │       └── 📄 generator.py          # Sinh báo cáo tự động
 │   │
-│   ├── 📂 model_registry/               # 📦 MODEL REGISTRY (Production Models)
-│   │   ├── 📄 registry.json             # Metadata: model versions, metrics, run_id
-│   │   ├── 📄 xgboost_v1_20251207_154104.joblib
-│   │   └── 📄 xgboost_v2_20251207_160224.joblib
-│   │
-│   ├── 📂 monitoring/                   # 👁️ MODEL MONITORING
-│   │   └── 📄 performance_log.csv       # Log hiệu năng theo thời gian (tracking drift, degradation)
-│   │
-│   ├── 📂 versions/                     # 🔖 DATA VERSIONING
-│   │   └── 📄 versions.json             # Hash và metadata của các phiên bản dữ liệu
-│   │
-│   ├── 📂 figures/                      # 📊 Latest figures (symbolic links hoặc copy)
-│   └── 📂 logs/                         # 📝 Global logs
-│       └── 📄 MAIN_20251207.log
+│   └── 📂 visualization/                # 📈 VISUALIZATION MODULE
+│       ├── 📄 __init__.py
+│       ├── 📄 eda_plots.py              # Biểu đồ phân tích khám phá (EDA)
+│       └── 📄 evaluate_plots.py         # Biểu đồ đánh giá model (ROC, Confusion Matrix)
 │
-└── 📂 tests/                            # 🧪 TESTING SUITE
-    ├── 📄 conftest.py                   # Pytest fixtures và configuration
-    ├── 📄 test_utils.py                 # Tests cho src/utils.py
-    ├── 📄 test_pipeline.py              # Tests cho src/pipeline.py
-    │
-    ├── 📂 test_data/                    # Tests cho src/data/
-    │   ├── 📄 __init__.py
-    │   ├── 📄 test_preprocessor.py      # Tests cho DataPreprocessor
-    │   └── 📄 test_transformer.py       # Tests cho DataTransformer
-    │
-    ├── 📂 test_models/                  # Tests cho src/models/
-    │   ├── 📄 __init__.py
-    │   ├── 📄 test_trainer.py           # Tests cho ModelTrainer
-    │   ├── 📄 test_optimizer.py         # Tests cho ModelOptimizer
-    │   └── 📄 test_evaluator.py         # Tests cho ModelEvaluator
-    │
-    ├── 📂 test_ops/                     # Tests cho src/ops/
-    │   ├── 📄 __init__.py
-    │   ├── 📄 test_dataops.py           # Tests cho DataValidator, DataVersioning
-    │   └── 📄 test_mlops.py             # Tests cho ExperimentTracker, ModelRegistry, etc.
-    │
-    ├── 📂 test_visualization/           # Tests cho src/visualization/
-    │   ├── 📄 __init__.py
-    │   ├── 📄 test_eda_plots.py         # Tests cho EDAVisualizer
-    │   └── 📄 test_evaluate_plots.py    # Tests cho EvaluateVisualizer
-    │
-    └── 📂 data/                         # Test data samples
-        ├── 📄 sample_raw.csv            # Raw data mẫu cho testing
-        └── 📄 sample_processed.csv      # Processed data mẫu
+├── 📂 data/                             # 💾 DỮ LIỆU (LOCAL WORKSPACE)
+│   ├── 📂 raw/                          # Dữ liệu thô gốc
+│   ├── 📂 processed/                    # Dữ liệu đã làm sạch
+│   └── 📂 train_test/                   # Dữ liệu đã split/transform để train
+│
+├── 📂 artifacts/                        # 🗄️ OUTPUTS & ARCHIVE (Generated at runtime)
+│   ├── 📂 experiments/                  # Logs chi tiết từng lần chạy
+│   ├── 📂 model_registry/               # Các model đã đóng gói cho production
+│   ├── 📂 monitoring/                   # Logs giám sát hiệu năng
+│   ├── 📂 versions/                     # Metadata các phiên bản dữ liệu
+│   ├── 📂 figures/                      # Hình ảnh biểu đồ mới nhất
+│   └── 📂 logs/                         # System logs
+│
+└── 📂 tests/                            # 🧪 TESTING SUITE (Pytest)
+    ├── 📄 conftest.py                   # Fixtures config
+    ├── 📄 test_pipeline.py              # Integration tests
+    ├── 📄 test_utils.py                 # Unit tests cho utils
+    ├── 📂 test_data/                    # Tests cho data processing
+    ├── 📂 test_models/                  # Tests cho model logic
+    ├── 📂 test_ops/                     # Tests cho MLOps/DataOps components
+    └── 📂 test_visualization/           # Tests cho plotting functions
 ```
 
-### Giải thích các thành phần quan trọng
-
-| Thư mục/File | Mục đích | Khi nào cần |
-|--------------|----------|-------------|
-| `config/config.yaml` | Cấu hình tập trung cho toàn bộ pipeline | Thay đổi paths, model params, tuning settings |
-| `src/pipeline.py` | Orchestrator điều phối các stages | Entry point logic cho các modes (eda, train, full...) |
-| `src/data/preprocessor.py` | Clean và split data (stateless) | Xử lý dữ liệu thô ban đầu |
-| `src/data/transformer.py` | Feature engineering (stateful) | Học tham số từ train, apply cho test |
-| `src/utils.py` | Utilities: IOHandler, get_files_in_folder, filter_files_by_date | Đọc/ghi files, list/filter files |
-| `src/models/trainer.py` | Training logic | Train và evaluate models |
-| `src/ops/dataops.py` | DataOps: DataValidator, DataVersioning | Load and version data |
-| `src/ops/mlops.py` | MLOps: ExperimentTracker, ModelRegistry, ModelMonitor | Tracking, registry, monitoring |
-| `artifacts/experiments/` | Lưu trữ từng run | Review lại experiments cũ |
-| `artifacts/model_registry/` | Models production-ready | Deploy model vào production |
-| `artifacts/monitoring/` | Performance logs | Theo dõi model degradation |
-| `tests/` | Unit & integration tests | CI/CD, đảm bảo code quality |
-
----
 
 ## ⚙️ Cấu hình hệ thống (Configuration)
 
@@ -544,46 +470,37 @@ pip list
 
 #### 📋 Dependencies chi tiết (requirements.txt)
 
-**1. Core Data Science (Xử lý dữ liệu nền tảng)**
 ```
+# --- Core Data Science (Xử lý dữ liệu nền tảng) ---
 numpy>=1.24.3           # Tính toán ma trận, số học
-pandas>=2.0.3           # Xử lý DataFrame (Bản 2.0+ tối ưu bộ nhớ)
-openpyxl>=3.1.2         # BẮT BUỘC: Engine để đọc file Excel (.xlsx)
-```
+pandas>=2.0.3           # Xử lý DataFrame (Tối ưu bộ nhớ)
+scipy>=1.11.0           # Thống kê khoa học (Dùng cho Drift Detection)
+openpyxl>=3.1.2         # Engine đọc file Excel (.xlsx)
+pyarrow>=10.0.0         # Backend xử lý dữ liệu lớn (Bắt buộc cho Parquet)
+fastparquet>=2023.10.1  # Engine đọc/ghi file Parquet tối ưu
 
-**2. Machine Learning Models**
-```
-scikit-learn>=1.3.0     # Thư viện ML chính (Pipeline, Metrics, RF...)
-xgboost>=2.0.0          # Model Gradient Boosting (Mạnh mẽ hơn RF)
+# --- Machine Learning Models ---
+scikit-learn>=1.3.0     # Thư viện ML chính (Pipeline, Metrics, RF)
+xgboost>=2.0.0          # Model Gradient Boosting (Mạnh mẽ)
 imbalanced-learn>=0.11.0 # Hỗ trợ SMOTE (Xử lý dữ liệu mất cân bằng)
-```
 
-**3. Visualization (Trực quan hóa)**
-```
+# --- Visualization (Trực quan hóa) ---
 matplotlib>=3.7.2       # Vẽ biểu đồ cơ bản
-seaborn>=0.12.2         # Vẽ biểu đồ thống kê đẹp (Heatmap, Distribution)
-```
+seaborn>=0.12.2         # Vẽ biểu đồ thống kê đẹp
 
-**4. Explainability (Giải thích mô hình)**
-```
-shap>=0.42.1            # Giải thích lý do tại sao khách hàng Churn (Feature Importance)
-```
+# --- Explainability (Giải thích mô hình) ---
+shap>=0.42.1            # Giải thích lý do Churn (Feature Importance)
 
-**5. Utilities & System (Cấu hình & Hệ thống)**
-```
+# --- Utilities & System (Cấu hình & Hệ thống) ---
 PyYAML>=6.0.1           # Đọc file cấu hình config.yaml
 joblib>=1.3.2           # Lưu/Tải model (.pkl) tốc độ cao
-tqdm>=4.66.1            # Thanh tiến trình (Loading bar) cho training
+tqdm>=4.66.1            # Thanh tiến trình (Loading bar)
 typing-extensions>=4.7.1 # Hỗ trợ Type Hinting
-```
 
-**6. Testing**
+# --- Testing ---
+pytest>=8.0.0           # Framework kiểm thử (Testing framework)
+pytest-cov>=6.0.0       # Báo cáo độ bao phủ code (Coverage reporting)
 ```
-pytest>=9.0.0           # Testing framework
-pytest-cov>=7.0.0       # Coverage reporting
-```
-
-> 💡 **Lưu ý**: Tổng dung lượng download ~500MB. Thời gian cài đặt ~5-10 phút tùy tốc độ mạng.
 
 ### ⚙️ Bước 4: Cấu hình (Optional)
 
@@ -604,122 +521,51 @@ models:
 ---
 
 ## 🎯 Cách chạy Pipeline (Running the Pipeline)
+#### 🖥️ CLI Arguments (Hướng dẫn chạy dòng lệnh)
 
-### 1️⃣ **Mode: EDA (Exploratory Data Analysis)**
+Script `main.py` hỗ trợ các tham số sau để điều khiển luồng chạy của pipeline:
 
-Phân tích dữ liệu thô, tạo các biểu đồ trực quan.
+| Tham số | Kiểu | Mặc định | Tùy chọn (Choices) | Mô tả chi tiết |
+| :--- | :---: | :---: | :--- | :--- |
+| **`--mode`** | `str` | `full` | `full`, `preprocess`, `train`, `eda`, `visualize`, `predict` | Chế độ vận hành của Pipeline:<br>• `full`: Chạy toàn bộ (Data -> Train -> Eval)<br>• `eda`: Phân tích khám phá dữ liệu<br>• `predict`: Dự đoán trên dữ liệu mới |
+| **`--data`** | `str` | *Config* | *Đường dẫn file* | Đường dẫn file dữ liệu đầu vào (Ghi đè cấu hình trong `config.yaml`).<br>Hỗ trợ đường dẫn tuyệt đối hoặc tương đối. |
+| **`--model`** | `str` | `all` | *Tên model* | Chỉ định model cụ thể để huấn luyện/dự đoán (Ví dụ: `xgboost`, `random_forest`). |
+| **`--optimize`** | `flag` | `False` | *(Không có)* | Thêm cờ này để bật chế độ **Hyperparameter Tuning** (Tinh chỉnh tham số mô hình). |
+| **`--config`** | `str` | `config.yaml` | *Đường dẫn file* | Đường dẫn đến file cấu hình tùy chỉnh (nếu cần). |
+
+### 💡 Usage Examples (Ví dụ)
+**Mode: EDA (Exploratory Data Analysis)**
 
 ```powershell
+# Phân tích dữ liệu thô, tạo các biểu đồ trực quan.
 python main.py --mode eda
 ```
-
-**Output:**
-- `artifacts/experiments/<run_id>/figures/eda/`
-  - `missing_values.png` - Biểu đồ missing values
-  - `correlation_matrix.png` - Ma trận tương quan
-  - `numerical_distributions.png` - Phân phối các biến số
-  - `target_distribution.png` - Phân phối target (Churn)
-  - `outliers_boxplot.png` - Boxplot phát hiện outliers
-
-**Use case:** Hiểu dữ liệu trước khi preprocessing
-
----
-
-### 2️⃣ **Mode: Preprocess (Data Preprocessing)**
-
-Làm sạch, split và transform dữ liệu.
+**Mode: Preprocess (Data Preprocessing)**
 
 ```powershell
+# Làm sạch, split và transform dữ liệu.
 python main.py --mode preprocess
 ```
-
-**Các bước thực hiện:**
-1. Load raw data từ Excel
-2. Clean data (remove duplicates, standardize)
-3. Split train/test (80/20, stratified)
-4. Fit transformer trên train set
-5. Transform cả train và test set
-
-**Output:**
-- `data/processed/E Commerce Dataset_cleaned.parquet`
-- `data/train_test/E Commerce Dataset_train.parquet`
-- `data/train_test/E Commerce Dataset_test.parquet`
-- `artifacts/experiments/<run_id>/data/` (snapshot)
-
-**Use case:** Chuẩn bị dữ liệu sẵn sàng cho training
-
----
-
-### 3️⃣ **Mode: Train (Model Training)**
-
-Train models với dữ liệu đã preprocess.
-
-#### A. Train một model cụ thể (không optimize)
-
+ **Mode: Train (Model Training)**
 ```powershell
-python main.py --mode train --model xgboost
-```
+## Train một model cụ thể (không optimize)
+python main.py --mode train --model 
 
-#### B. Train một model với hyperparameter tuning
-
-```powershell
+# Train một model với hyperparameter tuning
 python main.py --mode train --model xgboost --optimize
-```
 
-#### C. Train tất cả models
-
-```powershell
+# Train tất cả models
 python main.py --mode train --model all
-```
 
-#### D. Train tất cả models + optimize
-
-```powershell
+# Train tất cả models + optimize
 python main.py --mode train --model all --optimize
 ```
-
-**Models hỗ trợ:**
-- `logistic_regression` - Baseline model
-- `svm` - Support Vector Machine
-- `decision_tree` - Decision Tree
-- `random_forest` - Random Forest Ensemble
-- `xgboost` - XGBoost (thường tốt nhất)
-- `adaboost` - AdaBoost Ensemble
-- `all` - Train tất cả models trên
-
-**Output:**
-- `artifacts/experiments/<run_id>/models/xgboost.joblib` (best model)
-- `artifacts/experiments/<run_id>/models/transformer.joblib` (cần cho inference)
-- `artifacts/experiments/<run_id>/metrics.json`
-- `artifacts/model_registry/xgboost_v1_<timestamp>.joblib` (production model)
-
-**Use case:** Training và tìm model tốt nhất
-
----
-
-### 4️⃣ **Mode: Visualize (Visualization Only)**
-
-Chạy quick training (không optimize) và tạo visualizations.
-
+  **Mode: Visualize (Evaluation)**
 ```powershell
+# Chạy quick training (không optimize) và tạo visualizations.
 python main.py --mode visualize --model xgboost
 ```
-
-**Output:**
-- `artifacts/experiments/<run_id>/figures/evaluation/`
-  - `confusion_matrix_xgboost.png`
-  - `roc_curve.png`
-  - `feature_importance.png`
-  - `model_comparison.png`
-  - `shap_summary.png` (nếu enabled)
-
-**Use case:** Kiểm tra nhanh performance và feature importance
-
----
-
-### 5️⃣ **Mode: Full (End-to-End Pipeline)** ⭐ Khuyến nghị
-
-Chạy toàn bộ pipeline từ đầu đến cuối.
+**Mode: Full (End-to-End Pipeline)** ⭐ Khuyến nghị
 
 ```powershell
 # Full pipeline với model cụ thể + optimize
@@ -732,78 +578,23 @@ python main.py --mode full --model all --optimize
 python main.py --mode full --model xgboost
 ```
 
-**Các bước thực hiện:**
-1. **EDA** - Phân tích dữ liệu thô
-2. **Preprocess** - Clean, split, transform
-3. **Train** - Training models (với/không tuning)
-4. **Visualize** - Tạo tất cả visualizations
-5. **MLOps** - Log, registry, monitoring
-
-**Output:** Đầy đủ tất cả outputs từ các modes trên
-
-**Use case:** Production pipeline hoàn chỉnh
-
----
-
-### 🔧 Tham số CLI (Command-Line Arguments)
-
-| Argument | Mô tả | Mặc định | Ví dụ |
-|----------|-------|----------|-------|
-| `--mode` | Chế độ chạy | `full` | `eda`, `preprocess`, `train`, `visualize`, `full` |
-| `--model` | Model cụ thể | `all` | `xgboost`, `random_forest`, `logistic_regression` |
-| `--optimize` | Bật hyperparameter tuning | `False` | `--optimize` |
-| `--data` | Đường dẫn data (override config) | `None` | `--data data/raw/new_data.xlsx` |
-| `--config` | Đường dẫn config file | `config/config.yaml` | `--config config/custom.yaml` |
-
-### Ví dụ thực tế
-
-```powershell
-# 1. Khám phá dữ liệu mới
-python main.py --mode eda --data "data/raw/your_data.xlsx"
-
-# 2. Train XGBoost với tuning cho production
-python main.py --mode full --model xgboost --optimize
-
-# 3. So sánh tất cả models (không tuning - nhanh)
-python main.py --mode train --model all
-
-# 4. Chạy với config tùy chỉnh
-python main.py --mode full --config config/production.yaml --optimize
-
-# 5. Debug: Chỉ visualize kết quả
-python main.py --mode visualize --model random_forest
-```
-
----
-
 ## 🧪 Testing (Kiểm thử)
 
 ### 📊 Cấu trúc Tests
 
 Tests được tổ chức theo cấu trúc module tương ứng với `src/`:
 
-```
+```powershell
 tests/
 ├── conftest.py                    # Pytest fixtures chung
 ├── test_utils.py                  # Tests cho src/utils.py
 ├── test_pipeline.py               # Tests cho src/pipeline.py
-│
 ├── test_data/
-│   ├── test_preprocessor.py       # DataPreprocessor tests
-│   └── test_transformer.py        # DataTransformer tests
-│
 ├── test_models/
-│   ├── test_trainer.py            # ModelTrainer tests
-│   ├── test_optimizer.py          # ModelOptimizer tests
-│   └── test_evaluator.py          # ModelEvaluator tests
-│
 ├── test_ops/
-│   ├── test_dataops.py            # DataValidator, DataVersioning
-│   └── test_mlops.py              # ExperimentTracker, ModelRegistry, ModelMonitor
-│
+│   ├── test_dataops/           # DataValidator, DataVersioning
+│   └── test_mlops/              # ExperimentTracker, ModelRegistry, ModelMonitor
 ├── test_visualization/
-│   ├── test_eda_plots.py          # EDAVisualizer tests
-│   └── test_evaluate_plots.py     # EvaluateVisualizer tests
 ```
 
 ### 🏃 Cách chạy Tests
@@ -812,120 +603,17 @@ tests/
 # Chạy tất cả tests
 pytest
 
-# Chạy với verbose output
-pytest -v
-
 # Chạy module cụ thể
 pytest tests/test_data/ -v                  # Data module
 pytest tests/test_models/ -v                # Models module
-pytest tests/test_ops/ -v                   # Ops module (DataOps + MLOps)
 
 # Chạy file cụ thể
 pytest tests/test_data/test_preprocessor.py -v
 
 # Chạy test case cụ thể
 pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data -v
-
-# Chạy tests matching pattern
-pytest -k "transformer" -v                  # Tests có chứa "transformer"
-
-# Stop khi fail đầu tiên
-pytest -x
-
-# Chạy với coverage report
-pytest --cov=src --cov-report=term-missing
-
-# Coverage HTML report
-pytest --cov=src --cov-report=html
-# Mở file: htmlcov/index.html
 ```
 
-### 📋 Chi tiết Test Cases
-
-#### `test_utils.py` - Utility Functions
-```
-test_ensure_dir_creates_directory        # Tạo thư mục nếu chưa có
-test_set_random_seed                     # Đảm bảo reproducibility
-test_get_timestamp_format                # Format timestamp đúng
-test_get_files_in_folder                 # Lấy danh sách files trong folder
-test_filter_files_by_date                # Filter files theo YYYY-MM pattern
-test_compute_file_hash                   # Hash MD5 cho versioning
-test_config_loader                       # Load YAML config
-test_io_handler_read_write               # Đọc/ghi csv, xlsx, parquet
-```
-
-#### `test_data/test_preprocessor.py` - DataPreprocessor
-```
-test_load_data_excel                     # Load file Excel
-test_load_data_csv                       # Load file CSV
-test_clean_data_removes_duplicates       # Xóa dòng trùng lặp
-test_clean_data_standardizes_columns     # Chuẩn hóa tên cột
-test_split_data_stratified               # Split giữ tỷ lệ target
-test_split_data_ratio                    # Đúng tỷ lệ 80/20
-```
-
-#### `test_data/test_transformer.py` - DataTransformer
-```
-test_fit_transform_returns_tuple         # Trả về (X, y)
-test_transform_uses_learned_params       # Dùng params đã học (no leakage)
-test_handle_missing_numerical            # Impute median cho số
-test_handle_missing_categorical          # Impute mode cho category
-test_handle_outliers_iqr                 # Clip outliers theo IQR
-test_encode_categorical                  # Label encoding
-test_scale_features_standard             # StandardScaler
-test_feature_engineering                 # Tạo features mới
-test_get_resampler_smote                 # Trả về SMOTE object
-```
-
-#### `test_models/test_trainer.py` - ModelTrainer
-```
-test_load_train_test_data                # Load data từ files
-test_train_model_xgboost                 # Train XGBoost
-test_train_model_random_forest           # Train RandomForest
-test_train_all_models                    # Train tất cả models
-test_evaluate_returns_metrics            # Trả về metrics dict
-test_select_best_model                   # Chọn model theo scoring metric
-test_get_feature_importance              # Lấy feature importance
-test_save_load_model                     # Save/load model joblib
-```
-
-#### `test_ops/test_dataops.py` - DataOps
-```
-test_validator_null_ratio                # Tính null ratio
-test_validator_duplicate_ratio           # Tính duplicate ratio
-test_versioning_create_version           # Tạo version mới
-test_versioning_hash_based               # Hash-based versioning
-test_versioning_add_lineage              # Track data lineage
-```
-
-#### `test_ops/test_mlops.py` - MLOps
-```
-test_tracker_start_run                   # Bắt đầu experiment run
-test_tracker_log_params                  # Log parameters
-test_tracker_log_metrics                 # Log metrics
-test_tracker_end_run                     # Kết thúc run
-test_registry_register_model             # Đăng ký model mới
-test_registry_get_latest                 # Lấy model mới nhất
-test_monitor_log_performance             # Log performance metrics
-test_monitor_detect_drift                # Phát hiện performance drift
-test_monitor_health_check                # Kiểm tra model health
-test_explainer_feature_importance        # Feature importance
-test_explainer_shap                      # SHAP explanations
-```
-
-### ✅ Quick Test Commands
-
-```powershell
-# Smoke test - kiểm tra nhanh
-pytest tests/test_utils.py tests/test_data/ -v --tb=short
-
-# Test imports
-python -c "from src.pipeline import Pipeline; from src.utils import ConfigLoader; print('OK')"
-
-# Test một function cụ thể
-```
-
----
 
 ## 🔮 Dự đoán với dữ liệu mới (Prediction/Inference)
 
