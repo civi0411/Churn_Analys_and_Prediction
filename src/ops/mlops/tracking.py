@@ -1,7 +1,7 @@
 """
-src/ops/mlops/tracking.py
+Module `ops.mlops.tracking` - ExperimentTracker (đơn giản, file-based experiment tracking).
 
-Experiment Tracker - Track experiments and runs.
+Important keywords: Args, Methods, Returns, Notes
 """
 import os
 import sys
@@ -13,7 +13,12 @@ from ...utils import IOHandler, ensure_dir
 
 
 class ExperimentTracker:
-    """Custom Experiment Tracker - Alternative to MLflow."""
+    """
+    Simple experiment tracker thay thế cho MLflow (file-based).
+
+    Methods:
+        start_run(run_name), end_run(status), log_params, log_metrics, log_artifact, get_run_info
+    """
 
     def __init__(self, base_dir: str = "artifacts/experiments"):
         self.base_dir = base_dir

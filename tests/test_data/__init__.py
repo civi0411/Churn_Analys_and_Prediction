@@ -1,3 +1,2 @@
 # tests/test_data/__init__.py
-"""Tests for src/data module"""
-
+"""Các unit tests cho module `src/data` (preprocessing, transformer, preprocessor)."""

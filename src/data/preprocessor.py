@@ -1,26 +1,14 @@
 """
 src/data/preprocessor.py
 
-Data Preprocessing Module - Giai đoạn 1: Data Engineering (Stateless)
+Module xử lý tiền xử lý dữ liệu (DataPreprocessor).
 
-Module này chịu trách nhiệm:
-    - Load dữ liệu từ các nguồn khác nhau (Excel, CSV, Parquet)
-    - Làm sạch dữ liệu cơ bản (loại bỏ duplicates, chuẩn hóa giá trị)
-    - Chia dữ liệu thành Train/Test sets với stratified sampling
-
-Đặc điểm:
-    - Stateless: Không học tham số từ dữ liệu
-    - Hard-coded rules: Các quy tắc làm sạch cố định
-    - Tách biệt với Feature Engineering (Transformer)
-
-Example:
-    >>> preprocessor = DataPreprocessor(config, logger)
-    >>> df = preprocessor.load_data('data/raw/dataset.xlsx')
-    >>> df_clean = preprocessor.clean_data(df)
-    >>> train_df, test_df = preprocessor.split_data(df_clean)
-
-Author: Churn Prediction Team
+Chức năng chính:
+- Đọc dữ liệu (Excel, CSV, Parquet)
+- Làm sạch cơ bản (standardize, remove duplicates)
+- Chia train/test với stratified sampling
 """
+
 import pandas as pd
 from typing import Tuple, Dict  # Removed unused Optional
 from sklearn.model_selection import train_test_split
@@ -29,30 +17,18 @@ from ..utils import IOHandler
 
 
 class DataPreprocessor:
-    """
-    Data Preprocessor - Giai đoạn 1: Data Engineering (Stateless).
+    """Tiền xử lý dữ liệu (stateless).
 
-    Nhiệm vụ chính:
-        1. Load Data: Đọc dữ liệu từ file (Excel, CSV, Parquet)
-        2. Clean Basics: Làm sạch cơ bản (duplicates, standardize values)
-        3. Split Train/Test: Chia dữ liệu với stratified sampling
+    Nhiệm vụ:
+    - load_data(path)
+    - clean_data(df)
+    - split_data(df)
 
-    Attributes:
-        config (Dict): Configuration dictionary từ config.yaml
-        logger: Logger instance để ghi log
-        target_col (str): Tên cột target (mặc định: 'Churn')
-
-    Example:
-        # Example usage (for illustration only)
-        # config = {'data': {'target_col': 'Churn', 'test_size': 0.2}}
-        # preprocessor = DataPreprocessor(config, logger)
-        # df = preprocessor.load_data('data/raw/customers.xlsx')
-        # train_df, test_df = preprocessor.split_data(df)
+    Các ví dụ chi tiết bị loại bỏ để tránh doctest prompts.
     """
 
     def __init__(self, config: Dict, logger=None):
-        """
-        Khởi tạo DataPreprocessor.
+        """Khởi tạo với config và logger.
 
         Args:
             config (Dict): Configuration dictionary chứa các settings:
@@ -82,11 +58,6 @@ class DataPreprocessor:
             FileNotFoundError: Nếu file không tồn tại
             ValueError: Nếu định dạng file không được hỗ trợ
             IOError: Nếu có lỗi khi đọc file
-
-        Example:
-            >>> df = preprocessor.load_data('data/raw/E Commerce Dataset.xlsx')
-            >>> print(df.shape)
-            (5630, 20)
         """
         if self.logger:
             self.logger.info("=" * 60)
@@ -126,11 +97,6 @@ class DataPreprocessor:
             - Method này KHÔNG thay đổi DataFrame gốc (tạo copy)
             - KHÔNG xử lý missing values (để cho Transformer)
             - KHÔNG xử lý outliers (để cho Transformer)
-
-        Example:
-            # df_clean = preprocessor.clean_data(df)
-            # print(df_clean.duplicated().sum())
-            # 0
         """
         df = df.copy()
 
@@ -198,11 +164,6 @@ class DataPreprocessor:
         Configuration:
             - data.test_size: Tỷ lệ test set (default: 0.2)
             - data.random_state: Random seed (default: 42)
-
-        Example:
-            # train_df, test_df = preprocessor.split_data(df)
-            # print(f"Train: {len(train_df)}, Test: {len(test_df)}")
-            # Train: 4504, Test: 1126
         """
         if self.logger:
             self.logger.info("=" * 60)

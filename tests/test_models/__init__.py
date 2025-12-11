@@ -1,3 +1,2 @@
 # tests/test_models/__init__.py
-"""Tests for src/models module"""
-
+"""Các unit tests cho module `src/models`."""

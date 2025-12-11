@@ -1,6 +1,8 @@
 """
 tests/test_pipeline.py
-Tests for src/pipeline.py
+
+Các unit/integration test cho `src/pipeline.py`.
+Kiểm tra khởi tạo, các chế độ chạy (eda, predict), và tích hợp cơ bản.
 """
 import pytest
 import os
@@ -9,10 +11,10 @@ from src.pipeline import Pipeline
 
 
 class TestPipeline:
-    """Test cases for Pipeline class"""
+    """Các test cho lớp `Pipeline`"""
 
     def test_init(self, test_config, temp_artifacts_dir, mock_logger):
-        """Test khởi tạo Pipeline"""
+        """Kiểm tra khởi tạo `Pipeline` với cấu hình tối thiểu."""
         config = test_config.copy()
         config['experiments'] = {'base_dir': temp_artifacts_dir}
         config['dataops'] = {'versions_dir': os.path.join(temp_artifacts_dir, 'versions')}
@@ -25,7 +27,7 @@ class TestPipeline:
         assert pipeline.logger == mock_logger
 
     def test_run_eda_mode(self, test_config, temp_artifacts_dir, sample_raw_df, mock_logger, temp_dir):
-        """Test run với mode='eda'"""
+        """Chạy `Pipeline.run(mode='eda')` - smoke test không raise exception nghiêm trọng."""
         # Create test data file
         raw_path = os.path.join(temp_dir, 'test_data.csv')
         sample_raw_df.to_csv(raw_path, index=False)
@@ -42,12 +44,12 @@ class TestPipeline:
         # Should complete without error
         try:
             result = pipeline.run(mode='eda')
-        except Exception as e:
-            # Some errors are expected if not all components are set up
+        except Exception:
+            # Một số lỗi có thể xảy ra nếu thành phần chưa đầy đủ; không fail test
             pass
 
     def test_pipeline_components_initialized(self, test_config, temp_artifacts_dir, mock_logger):
-        """Test các components của Pipeline được khởi tạo"""
+        """Kiểm tra các component chính của pipeline được khởi tạo (preprocessor, transformer, trainer, tracker)."""
         config = test_config.copy()
         config['experiments'] = {'base_dir': temp_artifacts_dir}
         config['dataops'] = {'versions_dir': os.path.join(temp_artifacts_dir, 'versions')}
@@ -62,7 +64,7 @@ class TestPipeline:
         assert pipeline.tracker is not None
 
     def test_run_invalid_mode_raises_error(self, test_config, temp_artifacts_dir, mock_logger):
-        """Test run với mode không hợp lệ raises error"""
+        """Kiểm tra `Pipeline.run` with invalid mode raises ValueError."""
         config = test_config.copy()
         config['experiments'] = {'base_dir': temp_artifacts_dir}
         config['dataops'] = {'versions_dir': os.path.join(temp_artifacts_dir, 'versions')}
@@ -75,7 +77,7 @@ class TestPipeline:
             pipeline.run(mode='invalid_mode')
 
     def test_run_predict_mode(self, test_config, temp_artifacts_dir, sample_raw_df, mock_logger, temp_dir):
-        """Test run với mode='predict' sinh ra file output dự đoán"""
+        """Chạy mode='predict' hi vọng tạo file đầu ra (smoke-test, có thể bỏ qua lỗi nếu môi trường không đủ điều kiện)."""
         # Tạo file input giả lập
         raw_path = os.path.join(temp_dir, 'test_data.csv')
         sample_raw_df.to_csv(raw_path, index=False)
@@ -111,7 +113,7 @@ class TestPipelineIntegration:
 
     @pytest.mark.integration
     def test_full_pipeline_integration(self, test_config, temp_dir, sample_raw_df, mock_logger):
-        """Integration test: chạy full pipeline"""
+        """Integration test: chạy full pipeline (smoke/integration)."""
         # Setup directories
         raw_path = os.path.join(temp_dir, 'test_data.csv')
         sample_raw_df.to_csv(raw_path, index=False)

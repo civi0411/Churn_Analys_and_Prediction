@@ -1,7 +1,7 @@
 """
-src/ops/dataops/validator.py
+Module `ops.dataops.validator` - kiểm tra chất lượng dữ liệu và business rules.
 
-Data Validator - Check data quality.
+Important keywords: Args, Returns, Methods, Notes
 """
 import pandas as pd
 import re
@@ -11,13 +11,19 @@ from ...utils import IOHandler, ensure_dir
 
 
 class DataValidator:
-    """Data Validator - Check data quality (null, duplicate)."""
+    """
+    Kiểm tra data quality và business rules.
+
+    Methods:
+        validate_quality(df) -> basic quality metrics
+        validate_business_rules(df) -> structured report of violations
+    """
 
     def __init__(self, logger=None):
         self.logger = logger
 
     def validate_quality(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Check basic data quality."""
+        """Check basic data quality: null ratio, duplicate ratio."""
         n_rows = len(df)
         if n_rows == 0:
             return {"null_ratio": 0, "duplicate_ratio": 0, "rows": 0}
@@ -41,22 +47,9 @@ class DataValidator:
         """
         Validate domain/business rules and return a structured report.
 
-        Rules implemented:
-        - Range checks:
-            * Tenure >= 0
-            * CashbackAmount >= 0
-        - Logical checks:
-            * If CashbackAmount > 0 then OrderCount > 0
-        - Format checks:
-            * Email: basic email regex for values that are non-null
-            * Phone: basic phone number regex for values that are non-null
-        - Referential checks (best-effort):
-            * If `CustomerID` column exists, ensure no nulls (presence) and optionally uniqueness
-
         Returns a dict with keys:
-            - passed (bool): True if no violations
+            - passed (bool)
             - range_violations, logic_violations, format_violations, referential_violations
-              each is a mapping from rule -> {count, examples}
         """
         report = {
             'passed': True,

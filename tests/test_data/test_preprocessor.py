@@ -1,3 +1,10 @@
+"""
+tests/test_data/test_preprocessor.py
+
+Unit tests cho `DataPreprocessor`:
+- Kiểm tra làm sạch domain values
+- Kiểm tra chia train/test có stratify
+"""
 import pandas as pd
 import pytest
 
@@ -5,6 +12,7 @@ from src.data.preprocessor import DataPreprocessor
 
 
 def test_clean_data_basic(sample_raw_df, mock_logger, test_config):
+    """Kiểm tra `clean_data` chuẩn hoá một số giá trị domain (ví dụ 'Phone' -> 'Mobile Phone')."""
     pre = DataPreprocessor(test_config, mock_logger)
     df = sample_raw_df.copy()
 
@@ -20,6 +28,7 @@ def test_clean_data_basic(sample_raw_df, mock_logger, test_config):
 
 
 def test_split_data_stratified(sample_processed_df, test_config, mock_logger):
+    """Kiểm tra `split_data` chia dữ liệu có stratification theo target."""
     cfg = test_config.copy()
     cfg['data']['target_col'] = 'Churn'
     cfg['data']['test_size'] = 0.25
@@ -35,4 +44,3 @@ def test_split_data_stratified(sample_processed_df, test_config, mock_logger):
     p_all = sample_processed_df['Churn'].mean()
     p_test = test_df['Churn'].mean()
     assert abs(p_all - p_test) < 0.1
-

@@ -1,28 +1,7 @@
 """
-src/models/optimizer.py
+Hyperparameter optimization utilities (ModelOptimizer).
 
-Hyperparameter Optimization Module
-
-Module này chịu trách nhiệm tối ưu hóa hyperparameters cho ML models:
-    - GridSearchCV: Tìm kiếm exhaustive trên toàn bộ parameter grid
-    - RandomizedSearchCV: Tìm kiếm ngẫu nhiên (nhanh hơn với grid lớn)
-
-Features:
-    - Hỗ trợ cả sklearn estimators và imblearn Pipeline
-    - Stratified K-Fold cross-validation
-    - Tự động xử lý parameter prefix cho Pipeline
-    - Logging chi tiết thời gian và best params
-
-Example:
-    >>> optimizer = ModelOptimizer(config, logger)
-    >>> best_model, best_params = optimizer.optimize(
-    ...     estimator=RandomForestClassifier(),
-    ...     X_train=X_train, y_train=y_train,
-    ...     param_grid={'n_estimators': [100, 200]},
-    ...     model_name='random_forest'
-    ... )
-
-Author: Churn Prediction Team
+Important keywords: Args, Returns, Methods, Notes
 """
 from datetime import datetime
 from typing import Dict, Any, Tuple
@@ -37,79 +16,39 @@ except ImportError:
 
 class ModelOptimizer:
     """
-    Model Optimizer - Tối ưu hóa hyperparameters.
+    Tối ưu hyperparameters cho estimator bằng GridSearchCV / RandomizedSearchCV.
 
-    Sử dụng GridSearchCV hoặc RandomizedSearchCV với cross-validation
-    để tìm bộ parameters tốt nhất.
-
-    Attributes:
-        config (Dict): Configuration dictionary
-        logger: Logger instance
-
-    Example:
-        >>> optimizer = ModelOptimizer(config, logger)
-        >>> best_model, best_params = optimizer.optimize(
-        ...     estimator, X_train, y_train,
-        ...     param_grid={'n_estimators': [100, 200]},
-        ...     model_name='random_forest'
-        ... )
+    Methods:
+        optimize(estimator, X_train, y_train, param_grid, model_name)
     """
 
     def __init__(self, config: Dict, logger=None):
-        """
-        Khởi tạo ModelOptimizer.
+        """Khởi tạo ModelOptimizer.
 
         Args:
-            config (Dict): Configuration dictionary chứa:
-                - tuning.method: 'grid' hoặc 'randomized'
-                - tuning.cv_folds: Số folds cho cross-validation
-                - tuning.cv_strategy: 'stratified' hoặc 'kfold'
-                - tuning.scoring: Metric để optimize
-                - tuning.n_iter: Số iterations cho RandomizedSearch
-                - tuning.n_jobs: Số parallel jobs (-1 = all CPUs)
-            logger: Logger instance (optional)
+            config (Dict): cấu hình tuning
+            logger: logger tùy chọn
         """
         self.config = config
         self.logger = logger
 
     def optimize(self, estimator: Any, X_train, y_train,
                  param_grid: Dict, model_name: str) -> Tuple[Any, Dict]:
-        """
-        Thực hiện hyperparameter search (Grid hoặc Random).
-
-        Tự động phát hiện và xử lý imblearn Pipeline bằng cách
-        thêm prefix 'model__' vào parameters.
+        """Chạy tìm kiếm tham số và trả về best_estimator, best_params.
 
         Args:
-            estimator: Sklearn estimator hoặc imblearn Pipeline
-            X_train (pd.DataFrame): Training features
-            y_train (pd.Series): Training target
-            param_grid (Dict): Dictionary các parameters cần search
-            model_name (str): Tên model (để logging)
+            estimator: estimator hoặc imblearn Pipeline
+            X_train, y_train: dữ liệu huấn luyện
+            param_grid: dict các tham số để search
+            model_name: tên model để log
 
         Returns:
-            Tuple[Any, Dict]: (Best estimator, Best parameters)
-
-        Config Used:
-            - tuning.method: 'grid' hoặc 'randomized'
-            - tuning.cv_folds: Số folds (default: 5)
-            - tuning.scoring: Metric để optimize (default: 'roc_auc')
-            - tuning.n_iter: Số iterations cho RandomizedSearch (default: 30)
-
-        Example:
-            >>> best_model, best_params = optimizer.optimize(
-            ...     estimator=rf_model,
-            ...     X_train=X_train, y_train=y_train,
-            ...     param_grid={'n_estimators': [100, 200], 'max_depth': [10, 20]},
-            ...     model_name='random_forest'
-            ... )
-            >>> print(f"Best params: {best_params}")
+            (best_estimator, best_params)
         """
         if self.logger:
             self.logger.info(f"\n[OPTIMIZING] {model_name.upper()}")
 
         # 1. Xử lý param grid cho ImbPipeline (thêm prefix model__)
-        # Nếu estimator là ImbPipeline, các params của model cần có tiền tố 'model__'
         if ImbPipeline and isinstance(estimator, ImbPipeline):
             final_grid = {f"model__{k}": v for k, v in param_grid.items()}
         else:
@@ -144,10 +83,8 @@ class ModelOptimizer:
             search_kwargs['param_grid'] = final_grid
         else:
             search_kwargs['param_distributions'] = final_grid
-            # Cap n_iter to the total number of parameter combinations to avoid redundant sampling
             requested_n_iter = int(tuning_config.get('n_iter', 30))
             try:
-                # Estimate number of combinations
                 total_combinations = 1
                 for v in final_grid.values():
                     total_combinations *= len(v) if hasattr(v, '__len__') else 1

@@ -1,3 +1,9 @@
+"""
+tests/test_models/test_evaluator.py
+
+Tests cho evaluator (metrics calculation functions).
+"""
+
 import pytest
 import numpy as np
 import logging
@@ -6,7 +12,7 @@ from src.models.evaluator import ModelEvaluator
 
 
 def test_evaluate_with_predict_proba(trained_model, sample_train_test_split, mock_logger):
-    """Model with predict_proba (RandomForest) should return metrics including roc_auc and roc_curve_data."""
+    """Test model evaluation with predict_proba method."""
     X_train, X_test, y_train, y_test = sample_train_test_split
 
     evaluator = ModelEvaluator(logger=mock_logger)
@@ -44,7 +50,7 @@ def test_evaluate_with_predict_proba(trained_model, sample_train_test_split, moc
 
 
 def test_evaluate_without_predict_proba(sample_train_test_split):
-    """Models without predict_proba should have y_pred_proba and roc data as None."""
+    """Test model evaluation without predict_proba method."""
     from sklearn.svm import SVC
 
     X_train, X_test, y_train, y_test = sample_train_test_split
@@ -68,7 +74,7 @@ def test_evaluate_without_predict_proba(sample_train_test_split):
 
 
 def test_logging_on_evaluate(caplog, trained_model, sample_train_test_split):
-    """Ensure evaluator logs an INFO message when provided a logger."""
+    """Test logging during model evaluation."""
     X_train, X_test, y_train, y_test = sample_train_test_split
 
     # Use caplog to capture logs from the evaluator's logger
@@ -81,4 +87,3 @@ def test_logging_on_evaluate(caplog, trained_model, sample_train_test_split):
     # Expect at least one INFO record containing '[EVALUATION]'
     messages = [r.getMessage() for r in caplog.records]
     assert any('[EVALUATION]' in m or 'EVALUATION' in m for m in messages)
-

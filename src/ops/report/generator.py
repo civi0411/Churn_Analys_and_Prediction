@@ -1,25 +1,25 @@
 """
-src/ops/report/generator.py
+Module `ops.report.generator` - tạo báo cáo Markdown cho mỗi run (figures + summaries).
 
-Simplified Report Generator - Markdown reports with embedded figures
+Important keywords: Args, Returns, Methods
 """
 import os
 import json
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 import pandas as pd
 from ...utils import ensure_dir
 
 
 def sanitize_text(text):
-    """Sanitize text for markdown/reporting."""
+    """Clean text for markdown output."""
     if not isinstance(text, str):
         return str(text)
     return text.replace('|', '').replace('`', '').replace('\n', ' ').strip()
 
 
 def figure_insights(fname, best_metrics, all_metrics, feature_importance):
-    """Generate insights for a figure. Placeholder implementation."""
+    """Return short insights for given figure filename (placeholder)."""
     insights = []
     # Example: Add custom logic for each figure type
     if 'missing' in fname:
@@ -40,9 +40,10 @@ def figure_insights(fname, best_metrics, all_metrics, feature_importance):
 
 class ReportGenerator:
     """
-    Generate markdown reports for each run with embedded figures.
+    Tạo báo cáo markdown cho từng run với các ảnh nhúng.
 
-    Reports are saved in: artifacts/experiments/{run_id}/report.md
+    Methods:
+        generate_report(...)
     """
 
     def __init__(self, experiments_base_dir: str = "artifacts/experiments", logger=None):
@@ -360,7 +361,8 @@ class ReportGenerator:
                 'all_metrics': all_metrics,
             }
             if feature_importance is not None:
-                payload['feature_importance'] = feature_importance.to_dict(orient='records')
+                # Convert DataFrame to serializable list-of-dicts and cast for type-checkers
+                payload['feature_importance'] = cast(Any, feature_importance.to_dict(orient='records'))
 
             with open(report_path, 'w', encoding='utf-8') as f:
                 json.dump(payload, f, indent=4, ensure_ascii=False)

@@ -1,6 +1,6 @@
 """
 tests/test_ops/test_dataops.py
-Tests for src/ops/dataops.py
+Các unit tests cho dataops: DataValidator và DataVersioning.
 """
 import pytest
 import pandas as pd
@@ -267,6 +267,3 @@ class TestDataVersioning:
 
         assert comparison['hash_changed'] == True
         assert comparison['changes']['rows']['diff'] == 2  # 5 - 3 = 2
-
-
-

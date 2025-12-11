@@ -1,35 +1,18 @@
 """
 src/data/transformer.py
 
-Data Transformation Module - Giai đoạn 2: Feature Engineering (Stateful)
+DataTransformer: chuyển đổi, chuẩn hóa và chọn đặc trưng cho pipeline.
 
-Module này chịu trách nhiệm biến đổi dữ liệu với pattern Fit-Transform:
-    - Fit trên Train: Học các tham số (mean, std, encoders, bounds...)
-    - Transform trên Test: Áp dụng tham số đã học (không học mới)
+Tóm tắt (Summary):
+- Stateful transformer: fit trên tập train để học các tham số (imputers, encoders, scaler, outlier bounds, selected_features) và áp dụng cùng các tham số đó lên dữ liệu mới (test/predict).
+- Hỗ trợ: imputation, feature engineering, outlier clipping (IQR), label encoding, scaling, feature selection, và factory cho SMOTE.
 
-Pipeline xử lý:
-    1. Imputation: Điền missing values (median/mode)
-    2. Feature Engineering: Tạo features mới từ domain knowledge
-    3. Outlier Handling: Clip outliers theo IQR
-    4. Encoding: Label encode categorical columns
-    5. Scaling: Standardize/normalize numerical columns
-    6. Feature Selection: Chọn top K features quan trọng
-
-Đặc điểm:
-    - Stateful: Học và lưu trữ tham số từ training data
-    - Prevent Data Leakage: Test data không ảnh hưởng đến tham số
-    - Reproducible: Có thể áp dụng lại cho new data
-
-Example:
-    >>> transformer = DataTransformer(config, logger)
-    >>> X_train, y_train = transformer.fit_transform(train_df)
-    >>> X_test, y_test = transformer.transform(test_df)
-
-Author: Churn Prediction Team
+Important keywords: Args, Returns, Raises, Notes, Attributes, Methods
 """
+
 import pandas as pd
 import numpy as np
-from typing import Tuple, Dict, List, Any
+from typing import Tuple, Dict, List, Any, Optional
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
@@ -47,30 +30,25 @@ except ImportError:
 
 class DataTransformer:
     """
-    Data Transformer - Giai đoạn 2: Feature Engineering (Stateful).
+    Quản lý các bước tiền xử lý dữ liệu có trạng thái (stateful).
 
-    Thực hiện biến đổi dữ liệu với pattern Fit-Transform để tránh data leakage.
-    Tất cả tham số được học từ training data và áp dụng cho test data.
+    Mục đích:
+    - Học các tham số cần thiết từ training set và lưu lại trong `_learned_params`.
+    - Áp dụng chính xác cùng các bước lên dữ liệu mới (avoids data leakage).
 
     Attributes:
-        config (Dict): Configuration dictionary
-        logger: Logger instance
-        target_col (str): Tên cột target
-        numerical_cols (List[str]): Danh sách cột số
-        categorical_cols (List[str]): Danh sách cột phân loại
-        _learned_params (Dict): Các tham số đã học:
-            - imputers: SimpleImputer cho từng cột
-            - outliers: (lower, upper) bounds cho từng cột
-            - encoders: LabelEncoder cho từng cột categorical
-            - scaler: Scaler object (StandardScaler/MinMaxScaler/RobustScaler)
-            - selected_features: Danh sách features được chọn
+        config (Dict): Cấu hình pipeline.
+        pp (Dict): Phần preprocessing của config (shorthand).
+        logger: Logger tùy chọn.
+        target_col (str): Tên cột target.
+        _learned_params (dict): Lưu imputer, encoders, scaler, outliers, selected_features.
+        numerical_cols (List[str]): Danh sách cột số.
+        categorical_cols (List[str]): Danh sách cột phân loại.
 
-    Example:
-        >>> transformer = DataTransformer(config, logger)
-        >>> # Fit và transform trên train
-        >>> X_train, y_train = transformer.fit_transform(train_df)
-        >>> # Chỉ transform trên test (dùng params đã học)
-        >>> X_test, y_test = transformer.transform(test_df)
+    Methods:
+        fit_transform(df): Fit trên training data và trả về (X_transformed, y).
+        transform(df): Áp dụng các tham số đã học lên dữ liệu mới.
+        get_resampler(): Trả về instance SMOTE/SMOTETomek nếu được bật.
     """
 
     def __init__(self, config: Dict, logger=None):
@@ -78,14 +56,11 @@ class DataTransformer:
         Khởi tạo DataTransformer.
 
         Args:
-            config (Dict): Configuration dictionary chứa:
-                - data.target_col: Tên cột target
-                - preprocessing.missing_strategy: Strategy cho missing values
-                - preprocessing.outlier_method: Phương pháp xử lý outliers
-                - preprocessing.scaler_type: Loại scaler (standard/minmax/robust)
-                - preprocessing.create_features: Có tạo features mới không
-                - preprocessing.feature_selection: Có chọn features không
-            logger: Logger instance (optional)
+            config (Dict): Cấu hình dự án (phải có phần 'preprocessing' và 'data').
+            logger: Logger tuỳ chọn để log thông tin.
+
+        Notes:
+            - Không thực hiện fit tại khởi tạo; gọi `fit_transform` để học tham số.
         """
         self.config = config
         # Preprocessing-specific config (shorthand)
@@ -94,36 +69,33 @@ class DataTransformer:
         self.target_col = config.get('data', {}).get('target_col', 'Churn')
 
         # Lưu trữ các tham số đã học từ tập Train
-        self._learned_params = {
-            'imputers': {},
-            'outliers': {},  # (lower, upper) bound
-            'encoders': {},  # LabelEncoders
-            'scaler': None,  # Scaler object
-            'selected_features': []
-        }
+        self._learned_params: Dict[str, Any] = {
+             'imputers': {},
+             'outliers': {},  # (lower, upper) bound
+             'encoders': {},  # LabelEncoders
+             'scaler': None,  # Scaler object
+             'selected_features': []
+         }
+
+        # Explicit attribute for scaler to help type-checkers and access
+        self.scaler: Optional[Any] = None
 
         self.numerical_cols = []
         self.categorical_cols = []
 
     def fit_transform(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
-        Học tham số từ training data và biến đổi.
-
-        Method này CHỈ dùng cho TRAINING DATA. Nó sẽ:
-            1. Học các tham số (mean, std, encoders, bounds...)
-            2. Lưu trữ tham số vào _learned_params
-            3. Áp dụng transformation
+        Fit transformer trên training data và trả về X, y đã được biến đổi.
 
         Args:
-            df (pd.DataFrame): Training DataFrame (phải chứa target column)
+            df (pd.DataFrame): DataFrame training (phải chứa cột target).
 
         Returns:
-            Tuple[pd.DataFrame, pd.Series]: (X_train transformed, y_train)
+            Tuple[pd.DataFrame, pd.Series]: (X_transformed, y)
 
-        Example:
-            >>> X_train, y_train = transformer.fit_transform(train_df)
-            >>> print(X_train.shape, y_train.shape)
-            (4504, 15) (4504,)
+        Notes:
+            - Phương thức sẽ cập nhật `_learned_params` (imputers, encoders, scaler, outliers, selected_features).
+            - Chỉ dùng cho training set (sẽ học tham số).
         """
         if self.logger:
             self.logger.info(f"Fit Transform | Input Shape: {df.shape}")
@@ -131,23 +103,19 @@ class DataTransformer:
 
     def transform(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
-        Áp dụng transformation với tham số đã học.
-
-        Method này CHỈ dùng cho TEST DATA. Nó sẽ:
-            1. Sử dụng tham số đã học từ fit_transform()
-            2. KHÔNG học tham số mới (tránh data leakage)
+        Áp dụng các tham số đã học lên dữ liệu mới (test/predict).
 
         Args:
-            df (pd.DataFrame): Test DataFrame
+            df (pd.DataFrame): DataFrame đầu vào (có thể có hoặc không có cột target).
 
         Returns:
-            Tuple[pd.DataFrame, pd.Series]: (X_test transformed, y_test)
+            Tuple[pd.DataFrame, pd.Series]: (X_transformed, y_or_None)
 
         Raises:
-            Warning: Nếu gọi trước fit_transform(), sẽ dùng default params
+            Warning: Nếu chưa gọi `fit_transform` trước đó thì sẽ dùng tham số mặc định (không khuyến khích).
 
-        Example:
-            >>> X_test, y_test = transformer.transform(test_df)
+        Notes:
+            - Không học tham số mới (tránh data leakage).
         """
         if self.logger:
             self.logger.info(f"Transform     | Input Shape: {df.shape}")
@@ -155,24 +123,24 @@ class DataTransformer:
 
     def _process(self, df: pd.DataFrame, is_training: bool) -> Tuple[pd.DataFrame, pd.Series]:
         """
-        Core processing logic - xử lý chung cho cả fit_transform và transform.
+        Luồng xử lý chính (shared between fit_transform and transform).
 
-        Pipeline:
+        Pipeline steps (ngắn gọn):
             1. Tách X và y
-            2. Identify column types (numerical/categorical)
-            3. Handle missing values
-            4. Feature engineering
-            5. Handle outliers
-            6. Encode categorical
-            7. Scale features
-            8. Feature selection
+            2. Xác định kiểu cột (numerical/categorical)
+            3. Imputation
+            4. Feature engineering (tuỳ chọn)
+            5. Outlier clipping (IQR)
+            6. Encoding cho categorical
+            7. Scaling cho numerical
+            8. Feature selection (fit trên train, reuse trên test)
 
         Args:
             df (pd.DataFrame): Input DataFrame
-            is_training (bool): True nếu đang training (học params), False nếu testing
+            is_training (bool): True nếu đang fit (training), False nếu apply (testing)
 
         Returns:
-            Tuple[pd.DataFrame, pd.Series]: (X transformed, y)
+            Tuple[pd.DataFrame, pd.Series]: (X_transformed, y_or_None)
         """
         df = df.copy()
 
@@ -223,32 +191,35 @@ class DataTransformer:
 
     def _identify_types(self, df: pd.DataFrame) -> None:
         """
-        Phân loại cột thành numerical và categorical.
+        Xác định cột numerical và categorical.
 
         Args:
-            df (pd.DataFrame): Input DataFrame
+            df (pd.DataFrame): DataFrame đầu vào (features only).
 
         Sets:
-            self.numerical_cols: List các cột số (int64, float64)
-            self.categorical_cols: List các cột phân loại (object, category)
+            self.numerical_cols: List các cột kiểu số (int64, float64).
+            self.categorical_cols: List các cột kiểu object/category.
         """
         self.numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
         self.categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
 
     def _handle_missing(self, df: pd.DataFrame, is_training: bool) -> pd.DataFrame:
         """
-        Xử lý missing values sử dụng SimpleImputer.
-
-        Strategy:
-            - Numerical: median (robust với outliers)
-            - Categorical: mode (most frequent) hoặc 'Unknown'
+        Impute missing values bằng SimpleImputer theo cấu hình.
 
         Args:
             df (pd.DataFrame): Input DataFrame
-            is_training (bool): True nếu đang học imputer
+            is_training (bool): True nếu fit imputer từ dữ liệu
 
         Returns:
-            pd.DataFrame: DataFrame đã impute missing values
+            pd.DataFrame: DataFrame sau imputation
+
+        Config (pp):
+            preprocessing.missing_strategy.numerical: 'median'|'mean' (default 'median')
+            preprocessing.missing_strategy.categorical: 'mode'|'unknown' (default 'mode')
+
+        Notes:
+            - Lưu imputer vào `_learned_params['imputers']` khi is_training=True.
         """
         missing_cfg = self.pp.get('missing_strategy', {})
 
@@ -283,25 +254,19 @@ class DataTransformer:
 
     def _feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Tạo các đặc trưng mới từ Domain Knowledge.
-
-        Features được tạo:
-            - avg_cashbk_per_order: Cashback trung bình mỗi đơn
-            - order_frequency_mpm: Tần suất đặt hàng theo tháng
-            - coupon_rate: Tỷ lệ sử dụng coupon
-            - engagement_score: Điểm tương tác (giờ dùng app * log devices)
-            - log_*: Log transform cho các cột bị lệch
-            - city_is_tier1: Binary feature cho thành phố tier 1
-            - multi_address: Có nhiều địa chỉ không
+        Tạo các feature mới theo quy tắc domain có sẵn (tuỳ chọn).
 
         Args:
             df (pd.DataFrame): Input DataFrame
 
         Returns:
-            pd.DataFrame: DataFrame với features mới
+            pd.DataFrame: DataFrame có thêm feature mới (nếu bật)
 
         Config:
-            preprocessing.create_features: Bật/tắt feature engineering
+            preprocessing.create_features: bool (default False)
+
+        Notes:
+            - Chỉ thêm các cột nếu dữ liệu có các nguồn cột cần thiết.
         """
         if not self.pp.get('create_features', False):
             return df
@@ -336,25 +301,21 @@ class DataTransformer:
 
     def _handle_outliers(self, df: pd.DataFrame, is_training: bool) -> pd.DataFrame:
         """
-        Xử lý outliers bằng phương pháp IQR Clipping.
-
-        Công thức:
-            - Q1 = 25th percentile
-            - Q3 = 75th percentile
-            - IQR = Q3 - Q1
-            - Lower bound = Q1 - threshold * IQR
-            - Upper bound = Q3 + threshold * IQR
+        Giảm ảnh hưởng outliers bằng clipping theo IQR.
 
         Args:
             df (pd.DataFrame): Input DataFrame
-            is_training (bool): True nếu đang học bounds
+            is_training (bool): True nếu tính và lưu bounds từ train
 
         Returns:
-            pd.DataFrame: DataFrame đã clip outliers
+            pd.DataFrame: DataFrame sau clipping
 
         Config:
-            preprocessing.outlier_method: 'iqr' (chỉ hỗ trợ IQR)
-            preprocessing.outlier_threshold: Hệ số IQR (default: 1.5)
+            preprocessing.outlier_method: 'iqr' (hiện chỉ hỗ trợ IQR)
+            preprocessing.outlier_threshold: float (default 1.5)
+
+        Notes:
+            - Lưu (lower, upper) cho mỗi cột số vào `_learned_params['outliers']` khi is_training=True.
         """
         method = self.pp.get('outlier_method', 'iqr')
         threshold = self.pp.get('outlier_threshold', 1.5)
@@ -379,20 +340,21 @@ class DataTransformer:
 
     def _encode_categorical(self, df: pd.DataFrame, is_training: bool) -> pd.DataFrame:
         """
-        Encode categorical columns sử dụng LabelEncoder.
-
-        Xử lý unseen labels:
-            - Labels không có trong training sẽ được gán giá trị -1
+        Encode categorical columns bằng LabelEncoder.
 
         Args:
             df (pd.DataFrame): Input DataFrame
-            is_training (bool): True nếu đang fit encoder
+            is_training (bool): True nếu fit encoder
 
         Returns:
             pd.DataFrame: DataFrame đã encode
 
         Config:
-            preprocessing.categorical_encoding: 'label' (chỉ hỗ trợ label encoding)
+            preprocessing.categorical_encoding: 'label' (hiện chỉ hỗ trợ label encoding)
+
+        Notes:
+            - Unseen labels trên dữ liệu mới được gán giá trị -1 (an toàn với scikit-learn LabelEncoder).
+            - Lưu encoder vào `_learned_params['encoders']` khi is_training=True.
         """
         encoding_method = self.pp.get('categorical_encoding', 'label')
 
@@ -412,22 +374,20 @@ class DataTransformer:
 
     def _scale_features(self, df: pd.DataFrame, is_training: bool) -> pd.DataFrame:
         """
-        Scale numerical features.
-
-        Scalers hỗ trợ:
-            - StandardScaler: z-score normalization (mean=0, std=1)
-            - MinMaxScaler: scale về [0, 1]
-            - RobustScaler: dùng median và IQR (robust với outliers)
+        Scale numerical features theo scaler cấu hình.
 
         Args:
             df (pd.DataFrame): Input DataFrame
-            is_training (bool): True nếu đang fit scaler
+            is_training (bool): True nếu fit scaler
 
         Returns:
             pd.DataFrame: DataFrame đã scale
 
         Config:
-            preprocessing.scaler_type: 'standard', 'minmax', hoặc 'robust'
+            preprocessing.scaler_type: 'standard'|'minmax'|'robust' (default 'standard')
+
+        Notes:
+            - Lưu scaler vào `_learned_params['scaler']` khi is_training=True.
         """
         cols = [c for c in self.numerical_cols if c in df.columns]
         if not cols: return df
@@ -444,34 +404,31 @@ class DataTransformer:
 
             df[cols] = scaler.fit_transform(df[cols])
             self._learned_params['scaler'] = scaler
-        elif self._learned_params.get('scaler'):
-            df[cols] = self._learned_params['scaler'].transform(df[cols])
+            self.scaler = scaler
+        elif self.scaler:
+            df[cols] = self.scaler.transform(df[cols])
 
         return df
 
     def _select_features(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, List[str]]:
         """
-        Chọn top K features quan trọng nhất.
-
-        Methods hỗ trợ:
-            - f_classif: ANOVA F-value (nhanh, linear relationship)
-            - mutual_info: Mutual Information (chậm hơn, nonlinear)
+        Chọn top-K features bằng SelectKBest (f_classif hoặc mutual_info).
 
         Args:
-            X (pd.DataFrame): Features DataFrame
-            y (pd.Series): Target Series
+            X (pd.DataFrame): Feature matrix
+            y (pd.Series): Target vector
 
         Returns:
-            Tuple[pd.DataFrame, List[str]]: (X với features đã chọn, danh sách tên features)
+            Tuple[pd.DataFrame, List[str]]: (X_selected, selected_feature_names)
 
         Config:
-            preprocessing.feature_selection: Bật/tắt
-            preprocessing.n_top_features: Số features cần chọn
-            preprocessing.feature_selection_method: 'f_classif' hoặc 'mutual_info'
+            preprocessing.feature_selection: bool
+            preprocessing.n_top_features: int
+            preprocessing.feature_selection_method: 'f_classif'|'mutual_info'
 
-        Note:
-            Method này CHỈ chạy trong training. Test data sẽ dùng
-            danh sách features đã được chọn từ training.
+        Notes:
+            - Bỏ các cột constant trước khi chọn.
+            - Chỉ chạy selector khi is_training=True; test chỉ reuse tên cột đã chọn.
         """
         # Remove constant columns (all values identical)
         nunique = X.nunique()
@@ -493,7 +450,12 @@ class DataTransformer:
         selector = SelectKBest(score_func=score_func, k=k)
         X_new = selector.fit_transform(X, y)
 
-        selected_cols = [col for col, selected in zip(X.columns, selector.get_support()) if selected]
+        # Use boolean mask and enumerate to build indices (avoids type-checker warnings)
+        support_mask = selector.get_support(indices=False)  # type: ignore
+        # Build a plain Python list from mask; ignore static type warnings for numpy array stubs
+        support_list = list(support_mask)  # type: ignore
+        selected_idx = [i for i, v in enumerate(support_list) if v]
+        selected_cols = [X.columns[i] for i in selected_idx]
 
         if self.logger:
             self.logger.info(f"Feature Select | Method: {method} | Selected: {len(selected_cols)}/{X.shape[1]}")
@@ -502,28 +464,19 @@ class DataTransformer:
 
     def get_resampler(self):
         """
-        Factory method: Tạo và trả về SMOTE resampler.
-
-        SMOTE (Synthetic Minority Over-sampling Technique) được dùng để
-        cân bằng class trong imbalanced datasets.
+        Factory: trả về SMOTE / SMOTETomek theo cấu hình.
 
         Returns:
-            SMOTE hoặc SMOTETomek object nếu được cấu hình
-            None nếu không dùng SMOTE hoặc imblearn không được cài
+            resampler instance or None
 
         Config:
-            preprocessing.use_smote: Bật/tắt SMOTE
-            preprocessing.k_neighbors: Số neighbors cho SMOTE
-            preprocessing.use_tomek: Dùng SMOTETomek (SMOTE + Tomek Links cleaning)
+            preprocessing.use_smote: bool
+            preprocessing.k_neighbors: int
+            preprocessing.use_tomek: bool
 
-        Note:
-            Resampler này được inject vào ModelTrainer, KHÔNG được dùng
-            trong transform() vì resampling chỉ áp dụng cho training data.
-
-        Example:
-            >>> resampler = transformer.get_resampler()
-            >>> if resampler:
-            ...     X_resampled, y_resampled = resampler.fit_resample(X_train, y_train)
+        Notes:
+            - Nếu imblearn không cài đặt sẽ trả về None và log warning.
+            - Resampler dùng ngoài transform (ví dụ trong trainer).
         """
         if not self.pp.get('use_smote', False):
             return None

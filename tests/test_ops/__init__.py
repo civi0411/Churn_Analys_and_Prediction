@@ -1,3 +1,2 @@
 # tests/test_ops/__init__.py
-"""Tests for src/ops module"""
-
+"""Các unit tests cho module `src/ops` (helpers, dataops, mlops)."""

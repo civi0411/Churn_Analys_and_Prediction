@@ -1,7 +1,7 @@
 """
-src/ops/dataops/drift_detector.py
+Module `ops.dataops.drift_detector` - phát hiện data drift giữa dữ liệu mới và reference (training).
 
-Data Drift Detection Module - Phát hiện thay đổi data distribution
+Important keywords: Args, Returns, Methods, Notes
 """
 import os
 import pandas as pd
@@ -14,19 +14,19 @@ from ...utils import IOHandler, ensure_dir, get_timestamp
 
 class DataDriftDetector:
     """
-    Phát hiện drift giữa data mới và reference data (training data).
+    Phát hiện drift giữa `new_data` và `reference_data` (training baseline).
 
     Methods:
-    - detect_numerical_drift: KS test cho numerical features
-    - detect_categorical_drift: Chi-square test cho categorical
-    - detect_schema_drift: So sánh columns, dtypes, missing patterns
+        detect_drift(new_data, threshold): tổng hợp schema/numerical/categorical drift
+        _detect_numerical_drift, _detect_categorical_drift, _detect_schema_drift
     """
 
     def __init__(self, reference_data: pd.DataFrame, logger=None):
-        """
+        """Khởi tạo với reference_data (baseline).
+
         Args:
-            reference_data: Training data làm baseline
-            logger: Logger instance
+            reference_data (pd.DataFrame): dữ liệu training làm baseline
+            logger: Logger tùy chọn
         """
         self.reference_data = reference_data.copy()
         self.logger = logger
@@ -35,7 +35,7 @@ class DataDriftDetector:
         self.ref_stats = self._compute_statistics(reference_data)
 
     def _compute_statistics(self, df: pd.DataFrame) -> Dict:
-        """Tính toán statistics cho reference data"""
+        """Tính statistics cơ bản cho reference data (numerical/categorical/schema)."""
         stats_out = {
             'numerical': {},
             'categorical': {},

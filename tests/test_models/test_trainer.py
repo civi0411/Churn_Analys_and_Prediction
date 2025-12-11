@@ -1,3 +1,9 @@
+"""
+tests/test_models/test_trainer.py
+
+Unit tests cho `trainer` (smoke tests cơ bản cho luồng huấn luyện).
+"""
+
 import os
 import pytest
 import pandas as pd
@@ -7,7 +13,7 @@ from src.models.trainer import ModelTrainer
 
 
 def test_trainer_load_and_train(temp_dir, sample_processed_df, test_config, mock_logger):
-    """Smoke test: load data into trainer and run train_all_models (baseline, no optimize)."""
+    """Kiểm tra nhanh: tải dữ liệu vào trainer và chạy train_all_models (cơ sở, không tối ưu hóa)."""
     # Prepare train/test split files
     train_file = os.path.join(temp_dir, 'train.parquet')
     test_file = os.path.join(temp_dir, 'test.parquet')
@@ -35,7 +41,7 @@ def test_trainer_load_and_train(temp_dir, sample_processed_df, test_config, mock
 
 
 def test_save_and_load_model(temp_dir, sample_processed_df, test_config, mock_logger):
-    """Test save_model and load_model roundtrip"""
+    """Kiểm tra lưu_model và load_model vòng lặp"""
     train_file = os.path.join(temp_dir, 'train.parquet')
     test_file = os.path.join(temp_dir, 'test.parquet')
 
@@ -60,4 +66,3 @@ def test_save_and_load_model(temp_dir, sample_processed_df, test_config, mock_lo
 
     loaded = trainer.load_model(model_path)
     assert loaded is not None
-

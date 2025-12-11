@@ -1,23 +1,9 @@
 """
-src/visualization/eda_plots.py
+Module `visualization.eda_plots` - các hàm vẽ EDA và lưu figure.
 
-Exploratory Data Analysis Visualization Module
-
-Tạo các biểu đồ EDA:
-    1. missing_values.png - Missing values bar chart
-    2. target_distribution.png - Target pie chart
-    3. numerical_distributions.png - Histogram + KDE (grid)
-    4. boxplots.png - Boxplots cho outliers (grid)
-    5. correlation_matrix.png - Heatmap correlation
-    6. correlation_with_target.png - Top features với target
-    7. churn_by_category.png - Churn rate theo categories (grid)
-
-Example:
-    >>> visualizer = EDAVisualizer(config, logger)
-    >>> visualizer.run_full_eda(df, target_col='Churn')
-
-Author: Churn Prediction Team
+Important keywords: Args, Returns, Notes, Methods
 """
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -29,35 +15,19 @@ from ..utils import ensure_dir
 
 class EDAVisualizer:
     """
-    EDA Visualizer - Tạo các biểu đồ phân tích dữ liệu.
+    Trợ giúp tạo và lưu các biểu đồ EDA.
 
-    Outputs:
-        - missing_values.png: Bar chart % missing
-        - target_distribution.png: Pie chart target
-        - numerical_distributions.png: Histograms
-        - boxplots.png: Outlier detection
-        - correlation_matrix.png: Heatmap
-        - correlation_with_target.png: Top features
-        - churn_by_category.png: Churn rate by category
-
-    Attributes:
-        config (dict): Configuration
-        logger: Logger instance
-        eda_dir (str): Output directory
-
-    Example:
-        >>> viz = EDAVisualizer(config, logger)
-        >>> viz.run_full_eda(df, 'Churn')
+    Methods:
+        run_full_eda(df, target_col)
     """
 
     def __init__(self, config: dict, logger=None, run_specific_dir=None):
-        """
-        Khởi tạo EDAVisualizer.
+        """Khởi tạo EDAVisualizer.
 
         Args:
-            config: Config dict (artifacts.figures_dir)
-            logger: Logger instance
-            run_specific_dir: Thư mục run cụ thể (optional)
+            config (dict): cấu hình
+            logger: logger (optional)
+            run_specific_dir (str): thư mục run để lưu figures
         """
         self.config = config
         self.logger = logger
@@ -76,7 +46,12 @@ class EDAVisualizer:
         plt.rcParams.update({'font.size': 10})
 
     def _save_plot(self, fig, filename: str):
-        """Lưu figure và log."""
+        """Lưu figure vào thư mục EDA.
+
+        Args:
+            fig: matplotlib figure
+            filename: tên file
+        """
         if not self.eda_dir:
             if self.logger:
                 self.logger.warning(f"EDAVisualizer: eda_dir not set, cannot save {filename}")
@@ -90,8 +65,7 @@ class EDAVisualizer:
     # ==================== 1. MISSING VALUES ====================
 
     def plot_missing_values(self, df: pd.DataFrame):
-        """
-        Bar chart hiển thị % missing values.
+        """Vẽ bar chart phần trăm giá trị thiếu.
 
         Output: missing_values.png
         """
@@ -119,8 +93,7 @@ class EDAVisualizer:
     # ==================== 2. TARGET DISTRIBUTION ====================
 
     def plot_target_distribution(self, y: pd.Series):
-        """
-        Pie/Donut chart cho target distribution.
+        """Vẽ biểu đồ phân phối target.
 
         Output: target_distribution.png
         """
@@ -152,8 +125,7 @@ class EDAVisualizer:
     # ==================== 3. NUMERICAL DISTRIBUTIONS ====================
 
     def plot_numerical_distributions(self, df: pd.DataFrame, num_cols: List[str]):
-        """
-        Grid of Histogram + KDE cho numerical features.
+        """Vẽ histogram + KDE cho các cột số.
 
         Output: numerical_distributions.png
         """
@@ -183,8 +155,7 @@ class EDAVisualizer:
     # ==================== 4. BOXPLOTS ====================
 
     def plot_boxplots(self, df: pd.DataFrame, num_cols: List[str]):
-        """
-        Grid of Boxplots để detect outliers.
+        """Vẽ boxplots để phát hiện outliers.
 
         Output: boxplots.png
         """
@@ -213,8 +184,7 @@ class EDAVisualizer:
     # ==================== 5. CORRELATION MATRIX ====================
 
     def plot_correlation_matrix(self, df: pd.DataFrame):
-        """
-        Heatmap correlation matrix (lower triangle).
+        """Vẽ ma trận tương quan (heatmap).
 
         Output: correlation_matrix.png
         """
@@ -237,8 +207,7 @@ class EDAVisualizer:
     # ==================== 6. CORRELATION WITH TARGET ====================
 
     def plot_correlation_with_target(self, df: pd.DataFrame, target_col: str, top_n: int = 15):
-        """
-        Bar chart Top N features correlated với target.
+        """Vẽ bar chart các feature có tương quan cao với target.
 
         Output: correlation_with_target.png
         """
@@ -275,8 +244,7 @@ class EDAVisualizer:
     # ==================== 7. CHURN BY CATEGORY ====================
 
     def plot_churn_by_category(self, df: pd.DataFrame, target_col: str, max_features: int = 6):
-        """
-        Grid of bar charts: Churn rate theo từng categorical feature.
+        """Vẽ churn rate theo các categorical feature.
 
         Output: churn_by_category.png
         """
@@ -326,17 +294,9 @@ class EDAVisualizer:
     # ==================== RUN ALL ====================
 
     def run_full_eda(self, df: pd.DataFrame, target_col: str = None):
-        """
-        Chạy Full EDA - Tạo tất cả plots.
+        """Chạy toàn bộ EDA và lưu tất cả biểu đồ thích hợp.
 
-        Output:
-            - missing_values.png
-            - target_distribution.png (nếu có target)
-            - numerical_distributions.png
-            - boxplots.png
-            - correlation_matrix.png
-            - correlation_with_target.png (nếu có target)
-            - churn_by_category.png (nếu có target + categorical)
+        Output: các file ảnh trong thư mục EDA của run
         """
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 

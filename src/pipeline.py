@@ -1,40 +1,9 @@
 """
-src/pipeline.py
+Module `pipeline` - điều phối các bước ML pipeline (EDA, Preprocessing, Training, Visualization, Inference).
 
-Main ML Pipeline Orchestrator
-
-Module này là entry point chính điều phối toàn bộ ML pipeline:
-    - Stage 1: EDA (Exploratory Data Analysis)
-    - Stage 2: Preprocessing (Load → Clean → Split → Transform)
-    - Stage 3: Training (Model training với hyperparameter optimization)
-    - Stage 4: Visualization & Explainability (Plots, SHAP, Reports)
-
-Supported Modes:
-    - 'full': Chạy toàn bộ pipeline từ đầu đến cuối
-    - 'eda': Chỉ chạy EDA
-    - 'preprocess': Chỉ chạy preprocessing
-    - 'train': Chỉ chạy training (yêu cầu đã có train/test data)
-    - 'visualize': Chỉ chạy visualization
-    - 'predict': Dự đoán trên dữ liệu mới
-
-Architecture:
-    Pipeline sử dụng Composition pattern, sở hữu các components:
-    - DataPreprocessor, DataTransformer (Data module)
-    - ModelTrainer (Models module)
-    - EDAVisualizer, EvaluateVisualizer (Visualization module)
-    - ExperimentTracker, ModelRegistry, etc. (Ops module)
-
-Example:
-    >>> from src.pipeline import Pipeline
-    >>> from src.utils import ConfigLoader, Logger
-    >>>
-    >>> config = ConfigLoader.load_config('config/config.yaml')
-    >>> logger = Logger.get_logger('MAIN')
-    >>> pipeline = Pipeline(config, logger)
-    >>> trainer, metrics = pipeline.run(mode='full', optimize=True)
-
-Author: Churn Prediction Team
+Important keywords: Args, Returns, Methods, Notes
 """
+
 import os
 import shutil
 import logging
@@ -54,37 +23,22 @@ from .utils import IOHandler, set_random_seed, get_latest_train_test, get_timest
 
 class Pipeline:
     """
-    Main ML Pipeline Orchestrator.
-    Điều phối toàn bộ workflow từ raw data đến trained model:
-        RAW → CLEAN → SPLIT → TRANSFORM → TRAIN → EVALUATE → VISUALIZE
-    Attributes:
-        config (Dict): Configuration dictionary
-        logger: Logger instance
-        target_col (str): Tên cột target
-        tracker (ExperimentTracker): Experiment tracking
-        registry (ModelRegistry): Model registry
-        validator (DataValidator): Data validation
-        versioning (DataVersioning): Data versioning
-        monitor (ModelMonitor): Model monitoring
-        report_generator (ReportGenerator): Report generation
-        preprocessor (DataPreprocessor): Data preprocessing
-        transformer (DataTransformer): Data transformation
-        trainer (ModelTrainer): Model training
-        eda_viz (EDAVisualizer): EDA visualization
-        eval_viz (EvaluateVisualizer): Evaluation visualization
-    Example:
-        >>> pipeline = Pipeline(config, logger)
-        >>> trainer, metrics = pipeline.run(mode='full', optimize=True)
-        >>> print(f"Best model: {trainer.best_model_name}")
+    Lớp điều phối pipeline.
+
+    Mục đích:
+    - Thiết lập các component (preprocessor, transformer, trainer, ops)
+    - Điều phối các stage: EDA, preprocessing, training, visualization, predict
+
+    Methods:
+        run_eda(), run_preprocessing(), run_training(), run_visualization(), run_predict()
     """
 
     def __init__(self, config: Dict[str, Any], logger: logging.Logger):
-        """
-        Khởi tạo Pipeline với tất cả components.
+        """Khởi tạo Pipeline với config và logger.
 
         Args:
-            config (Dict[str, Any]): Configuration dictionary từ config.yaml
-            logger (logging.Logger): Logger instance
+            config (Dict): cấu hình dự án
+            logger (logging.Logger): logger instance
         """
         self.config = config
         self.logger = logger
@@ -124,9 +78,10 @@ class Pipeline:
     # STAGE 1: EXPLORATORY DATA ANALYSIS (EDA)
     # =========================================================================
     def run_eda(self) -> dict:
-        """
-        Exploratory Data Analysis trên raw data
-        Returns EDA summary for reporting.
+        """Chạy Exploratory Data Analysis trên raw data và trả về summary.
+
+        Returns:
+            dict: EDA summary (churn_rate, missing, n_rows, n_cols, duplicate, top_correlated)
         """
         self.logger.info("\n" + "=" * 70)
         self.logger.info("STAGE: EXPLORATORY DATA ANALYSIS")
@@ -171,7 +126,7 @@ class Pipeline:
                                  trainer: ModelTrainer = None,
                                  metrics: Dict = None,
                                  eda_summary: Dict = None):
-        """Generate report for current run."""
+        """Generate report cho run hiện tại."""
         try:
             feature_importance = None
             best_model_name = None
@@ -199,7 +154,11 @@ class Pipeline:
 
     # Helper method để lưu trạng thái DataTransformer
     def _save_transformer_state(self) -> str:
-        """Saves the fitted DataTransformer object state."""
+        """Lưu trạng thái đã fit của `DataTransformer` vào registry.
+
+        Returns:
+            str: Đường dẫn file đã lưu.
+        """
         ensure_dir(os.path.dirname(self.transformer_path))
         try:
             IOHandler.save_model(self.transformer, self.transformer_path)

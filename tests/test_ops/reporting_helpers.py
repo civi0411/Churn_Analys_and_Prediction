@@ -1,6 +1,14 @@
+"""
+tests/test_ops/reporting_helpers.py
+
+Smoke test import for reporting_helpers module.
+"""
+
 import pytest
-from src.ops.reporting_helpers import *
+import importlib
+
 
 def test_import_reporting_helpers():
-    # Test import thành công nếu module tồn tại
-    assert True
+    """Kiểm tra module `src.ops.reporting_helpers` import được thành công."""
+    mod = importlib.import_module('src.ops.reporting_helpers')
+    assert mod is not None

@@ -1,7 +1,7 @@
 """
-src/ops/mlops/registry.py
+Module `ops.mlops.registry` - quản lý lưu trữ và phiên bản mô hình (local registry).
 
-Model Registry - Manage model versions.
+Important keywords: Args, Methods, Returns
 """
 import os
 from typing import Dict, Any, Optional
@@ -10,7 +10,12 @@ from ...utils import IOHandler, ensure_dir
 
 
 class ModelRegistry:
-    """Manage model storage and versioning (Local)."""
+    """
+    Manage model storage and versioning (Local).
+
+    Methods:
+        register_model, get_latest_model, get_model_by_version, list_models, get_best_model
+    """
 
     def __init__(self, registry_dir: str):
         self.registry_dir = registry_dir

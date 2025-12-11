@@ -1,17 +1,18 @@
 """
 main.py
-Entry Point - Điểm khởi chạy duy nhất của dự án
+Điểm khởi chạy của dự án: parse CLI, load config, setup logger, chạy Pipeline.
 
-Usage:
-    python main.py                                    # Full pipeline
-    python main.py --mode eda                         # Chỉ chạy EDA
-    python main.py --mode train --optimize            # Train với tuning
-    python main.py --data file.csv                    # File cụ thể
+Usage examples (CLI):
+  python main.py                 # Full pipeline
+  python main.py --mode eda      # Chỉ chạy EDA
+  python main.py --mode train --optimize  # Train + tuning
+
+Important keywords: Args, Returns, Notes
 """
 import argparse
 import sys
 import os
-from src.utils import ConfigLoader, Logger, set_random_seed, IOHandler
+from src.utils import ConfigLoader, Logger, set_random_seed
 from src.pipeline import Pipeline
 
 
@@ -19,14 +20,13 @@ def main():
     """
     Entry point chính của pipeline.
 
-    Workflow:
-        1. Parse CLI arguments
-        2. Load config và setup logger
-        3. Chạy Pipeline theo mode
-        4. Log kết quả
+    Workflow ngắn gọn:
+      1. Parse CLI args
+      2. Load config và setup logger
+      3. Chạy `Pipeline.run()` theo mode
 
     Returns:
-        None. Exit code 0 nếu thành công, 1 nếu lỗi.
+        None (exit code quản lý bởi caller)
     """
     # 1. Thiết lập tham số dòng lệnh
     parser = argparse.ArgumentParser(
@@ -129,28 +129,11 @@ Examples:
             logger.info(f"PREDICTION RESULT SAVED: {pred_path}")
             logger.info(f"{'=' * 60}")
         else:
-            # Special-case: drift mode -> validate & predict with drift detection
-            if args.mode == 'drift':
-                # Run only the drift check and persist reports (json + md). Do not predict.
-                input_path = args.data or config['data'].get('raw_path')
-                logger.info(f"Running drift detection on: {input_path}")
-                try:
-                    df_new = IOHandler.read_data(input_path)
-                    report, report_path = pipeline.run_drift_check(df_new, threshold=args.drift_threshold)
-                    md_path = report_path[:-5] + '.md' if report_path.endswith('.json') else None
-                    logger.info(f"Drift JSON report: {report_path}")
-                    if md_path and os.path.exists(md_path):
-                        logger.info(f"Drift summary: {md_path}")
-                    logger.info(f"Drift severity: {report['summary'].get('drift_severity')}")
-                except Exception as e:
-                    logger.error(f"Drift check failed: {e}")
-                result = None
-            else:
-                result = pipeline.run(
-                    mode=args.mode,
-                    model_name=args.model,
-                    optimize=args.optimize
-                )
+            result = pipeline.run(
+                mode=args.mode,
+                model_name=args.model,
+                optimize=args.optimize
+            )
 
             if args.mode in ['train', 'full'] and result:
                 trainer, metrics = result

@@ -1,7 +1,7 @@
 """
-src/ops/dataops/versioning.py
+Module `ops.dataops.versioning` - quản lý version dữ liệu bằng hash-based versioning.
 
-Data Versioning - Manage data versions with hash-based versioning.
+Important keywords: Args, Returns, Methods
 """
 import os
 import pandas as pd
@@ -11,7 +11,13 @@ from ...utils import IOHandler, ensure_dir, compute_file_hash
 
 
 class DataVersioning:
-    """Manage data versions with hash-based versioning."""
+    """
+    Quản lý phiên bản dữ liệu (hash-based).
+
+    Methods:
+        create_version(file_path, dataset_name, df, ...)
+        get_version_info, list_versions, compare_versions, add_lineage
+    """
 
     def __init__(self, versions_dir: str, logger=None):
         self.versions_dir = versions_dir
@@ -37,13 +43,13 @@ class DataVersioning:
         description: str = None,
         tags: list = None
     ) -> str:
-        """Create new version for dataset."""
+        """Tạo phiên bản mới cho tập dữ liệu."""
         if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Cannot version missing file: {file_path}")
+            raise FileNotFoundError(f"Không thể version file không tồn tại: {file_path}")
 
         file_hash = compute_file_hash(file_path)
 
-        # Check idempotency
+        # Kiểm tra idempotency
         if dataset_name in self.history:
             if self.history[dataset_name] and self.history[dataset_name][-1]["hash"] == file_hash:
                 return self.history[dataset_name][-1]["version_id"]
@@ -119,7 +125,7 @@ class DataVersioning:
         return profile
 
     def add_lineage(self, dataset_name: str, parent_name: str, transformation: str = None):
-        """Add lineage information."""
+        """Thêm thông tin nguồn gốc."""
         if dataset_name not in self.history or not self.history[dataset_name]:
             return
 
@@ -136,7 +142,7 @@ class DataVersioning:
         self._save_history()
 
     def get_version_info(self, dataset_name: str, version_id: str = None) -> Dict:
-        """Get version info."""
+        """Lấy thông tin phiên bản."""
         if dataset_name not in self.history or not self.history[dataset_name]:
             return {}
 
@@ -150,7 +156,7 @@ class DataVersioning:
         return {}
 
     def get_lineage_tree(self, dataset_name: str) -> Dict:
-        """Get lineage tree."""
+        """Lấy cây nguồn gốc."""
         lineage = {"dataset": dataset_name, "parents": []}
 
         info = self.get_version_info(dataset_name)
@@ -168,18 +174,18 @@ class DataVersioning:
         return lineage
 
     def list_versions(self, dataset_name: str = None) -> Dict:
-        """List all versions."""
+        """Liệt kê tất cả các phiên bản."""
         if dataset_name:
             return {dataset_name: self.history.get(dataset_name, [])}
         return self.history
 
     def compare_versions(self, dataset_name: str, v1_id: str, v2_id: str) -> Dict:
-        """Compare two versions."""
+        """So sánh hai phiên bản."""
         v1 = self.get_version_info(dataset_name, v1_id)
         v2 = self.get_version_info(dataset_name, v2_id)
 
         if not v1 or not v2:
-            return {"error": "Version not found"}
+            return {"error": "Không tìm thấy phiên bản"}
 
         comparison = {
             "v1": v1_id,

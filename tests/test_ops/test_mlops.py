@@ -1,6 +1,7 @@
 """
 tests/test_ops/test_mlops.py
-Tests for src/ops/mlops.py
+
+Các unit tests cho các thành phần MLOps: ExperimentTracker, ModelRegistry, ModelMonitor, ModelExplainer, ReportGenerator.
 """
 import pytest
 import pandas as pd
@@ -18,17 +19,17 @@ from sklearn.ensemble import RandomForestClassifier
 
 
 class TestExperimentTracker:
-    """Test cases for ExperimentTracker class"""
+    """Tests cho ExperimentTracker"""
 
     def test_init(self, temp_dir):
-        """Test khởi tạo ExperimentTracker"""
+        """Kiểm tra khởi tạo `ExperimentTracker` và file experiments.csv được tạo."""
         tracker = ExperimentTracker(temp_dir)
 
         assert os.path.exists(temp_dir)
         assert os.path.exists(tracker.experiments_file)
 
     def test_start_run(self, temp_dir):
-        """Test start_run tạo run mới"""
+        """Kiểm tra `start_run` tạo run mới và thư mục run tồn tại."""
         tracker = ExperimentTracker(temp_dir)
         run_id = tracker.start_run('test_run')
 
@@ -37,7 +38,7 @@ class TestExperimentTracker:
         assert os.path.exists(tracker.current_run_dir)
 
     def test_end_run(self, temp_dir):
-        """Test end_run kết thúc run"""
+        """Kiểm tra `end_run` cập nhật trạng thái và end_time."""
         tracker = ExperimentTracker(temp_dir)
         tracker.start_run('test_run')
         tracker.end_run('FINISHED')
@@ -50,7 +51,7 @@ class TestExperimentTracker:
         assert df.iloc[0]['status'] == 'FINISHED'
 
     def test_log_params(self, temp_dir):
-        """Test log_params lưu parameters"""
+        """Kiểm tra `log_params` lưu params vào params.json."""
         tracker = ExperimentTracker(temp_dir)
         tracker.start_run('test_run')
 
@@ -61,7 +62,7 @@ class TestExperimentTracker:
         assert os.path.exists(params_file)
 
     def test_log_metrics(self, temp_dir):
-        """Test log_metrics lưu metrics"""
+        """Kiểm tra `log_metrics` lưu metrics vào metrics.json."""
         tracker = ExperimentTracker(temp_dir)
         tracker.start_run('test_run')
 
@@ -72,7 +73,7 @@ class TestExperimentTracker:
         assert os.path.exists(metrics_file)
 
     def test_get_run_info(self, temp_dir):
-        """Test get_run_info lấy thông tin run"""
+        """Kiểm tra `get_run_info` trả về params và metrics đã lưu."""
         tracker = ExperimentTracker(temp_dir)
         tracker.start_run('test_run')
         tracker.log_params({'param1': 'value1'})
@@ -86,17 +87,17 @@ class TestExperimentTracker:
 
 
 class TestModelRegistry:
-    """Test cases for ModelRegistry class"""
+    """Tests cho ModelRegistry"""
 
     def test_init(self, temp_dir):
-        """Test khởi tạo ModelRegistry"""
+        """Kiểm tra khởi tạo ModelRegistry và registry khởi tạo rỗng."""
         registry = ModelRegistry(temp_dir)
 
         assert os.path.exists(temp_dir)
         assert registry.registry == {}
 
     def test_register_model(self, temp_dir, trained_model):
-        """Test register_model đăng ký model"""
+        """Kiểm tra `register_model` lưu file mô hình và cập nhật registry."""
         registry = ModelRegistry(temp_dir)
 
         metrics = {'accuracy': 0.95, 'f1': 0.92}
@@ -109,7 +110,7 @@ class TestModelRegistry:
         assert len(registry.registry['random_forest']) == 1
 
     def test_register_model_increments_version(self, temp_dir, trained_model):
-        """Test register_model tăng version"""
+        """Kiểm tra version tăng khi đăng ký nhiều lần cùng model."""
         registry = ModelRegistry(temp_dir)
         metrics = {'accuracy': 0.95}
 
@@ -121,7 +122,7 @@ class TestModelRegistry:
         assert registry.registry['rf'][1]['version'] == 2
 
     def test_get_latest_model(self, temp_dir, trained_model):
-        """Test get_latest_model lấy model mới nhất"""
+        """Kiểm tra `get_latest_model` load model gần nhất."""
         registry = ModelRegistry(temp_dir)
         metrics = {'accuracy': 0.95}
 
@@ -133,7 +134,7 @@ class TestModelRegistry:
         assert hasattr(loaded_model, 'predict')
 
     def test_get_latest_model_returns_none_for_unknown(self, temp_dir):
-        """Test get_latest_model trả về None cho model không tồn tại"""
+        """Kiểm tra `get_latest_model` trả None cho tên model không tồn tại."""
         registry = ModelRegistry(temp_dir)
 
         result = registry.get_latest_model('unknown_model')
@@ -142,17 +143,17 @@ class TestModelRegistry:
 
 
 class TestModelMonitor:
-    """Test cases for ModelMonitor class"""
+    """Tests cho ModelMonitor"""
 
     def test_init(self, temp_dir):
-        """Test khởi tạo ModelMonitor"""
+        """Kiểm tra khởi tạo ModelMonitor và file performance_log tồn tại."""
         monitor = ModelMonitor(temp_dir)
 
         assert os.path.exists(temp_dir)
         assert os.path.exists(monitor.performance_log)
 
     def test_log_performance(self, temp_dir):
-        """Test log_performance ghi lại performance"""
+        """Kiểm tra `log_performance` ghi dòng metrics vào CSV."""
         monitor = ModelMonitor(temp_dir)
 
         metrics = {'accuracy': 0.95, 'f1': 0.92, 'precision': 0.90, 'recall': 0.94}
@@ -164,7 +165,7 @@ class TestModelMonitor:
         assert df.iloc[0]['accuracy'] == 0.95
 
     def test_get_performance_history(self, temp_dir):
-        """Test get_performance_history lấy lịch sử"""
+        """Kiểm tra `get_performance_history` trả lịch sử đã log."""
         monitor = ModelMonitor(temp_dir)
 
         monitor.log_performance('rf', {'accuracy': 0.95, 'f1': 0.92})
@@ -175,7 +176,7 @@ class TestModelMonitor:
         assert len(history) == 2
 
     def test_detect_drift(self, temp_dir):
-        """Test detect_drift phát hiện drift"""
+        """Kiểm tra `detect_drift` phát hiện drift khi metric giảm mạnh."""
         monitor = ModelMonitor(temp_dir)
 
         # Log baseline
@@ -189,7 +190,7 @@ class TestModelMonitor:
         assert result['drift'] > 0.05
 
     def test_detect_drift_no_drift(self, temp_dir):
-        """Test detect_drift không có drift"""
+        """Kiểm tra `detect_drift` không báo drift khi metric ổn định."""
         monitor = ModelMonitor(temp_dir)
 
         monitor.log_performance('rf', {'f1': 0.92})
@@ -200,7 +201,7 @@ class TestModelMonitor:
         assert result['drift_detected'] == False
 
     def test_check_health(self, temp_dir):
-        """Test check_health kiểm tra sức khỏe model"""
+        """Kiểm tra `check_health` trả status hợp lệ dựa trên thresholds."""
         monitor = ModelMonitor(temp_dir)
 
         current_metrics = {'f1': 0.85, 'accuracy': 0.90}
@@ -209,7 +210,7 @@ class TestModelMonitor:
         assert result['status'] in ['HEALTHY', 'WARNING', 'CRITICAL']
 
     def test_check_health_warning(self, temp_dir):
-        """Test check_health phát hiện warning"""
+        """Kiểm tra `check_health` báo warning khi mắt có metric thấp hơn threshold."""
         monitor = ModelMonitor(temp_dir)
 
         current_metrics = {'f1': 0.60, 'accuracy': 0.65}  # Below thresholds
@@ -222,10 +223,10 @@ class TestModelMonitor:
 
 
 class TestModelExplainer:
-    """Test cases for ModelExplainer class"""
+    """Tests cho ModelExplainer"""
 
     def test_init(self, trained_model, sample_train_test_split):
-        """Test khởi tạo ModelExplainer"""
+        """Kiểm tra khởi tạo ModelExplainer và gán feature_names đúng."""
         X_train, _, _, _ = sample_train_test_split
         feature_names = list(X_train.columns)
 
@@ -235,7 +236,7 @@ class TestModelExplainer:
         assert explainer.feature_names == feature_names
 
     def test_get_feature_importance(self, trained_model, sample_train_test_split):
-        """Test get_feature_importance với tree-based model"""
+        """Kiểm tra `get_feature_importance` trả DataFrame cho tree model."""
         X_train, _, _, _ = sample_train_test_split
         feature_names = list(X_train.columns)
 
@@ -248,7 +249,7 @@ class TestModelExplainer:
         assert 'importance' in importance.columns
 
     def test_get_feature_importance_top_n(self, trained_model, sample_train_test_split):
-        """Test get_feature_importance với top_n"""
+        """Kiểm tra `get_feature_importance` trả tối đa top_n hàng."""
         X_train, _, _, _ = sample_train_test_split
         feature_names = list(X_train.columns)
 
@@ -258,7 +259,7 @@ class TestModelExplainer:
         assert len(importance) <= 5
 
     def test_explain_with_shap(self, trained_model, sample_train_test_split, temp_dir):
-        """Test explain_with_shap tạo SHAP plot"""
+        """Kiểm tra `explain_with_shap` tạo file ảnh SHAP nếu SHAP cài được."""
         try:
             import shap
         except ImportError:
@@ -276,7 +277,7 @@ class TestModelExplainer:
         assert isinstance(result, bool)
 
     def test_init_with_pipeline_model(self, sample_train_test_split):
-        """Test init với model trong pipeline"""
+        """Kiểm tra init với model nằm trong pipeline (unwrap từ pipeline)."""
         try:
             from imblearn.pipeline import Pipeline as ImbPipeline
             from imblearn.over_sampling import SMOTE
@@ -299,17 +300,17 @@ class TestModelExplainer:
 
 
 class TestReportGenerator:
-    """Test cases for ReportGenerator class"""
+    """Tests cho ReportGenerator"""
 
     def test_init(self, temp_dir):
-        """Test khởi tạo ReportGenerator"""
+        """Kiểm tra khởi tạo ReportGenerator và thư mục báo cáo tồn tại."""
         report_dir = os.path.join(temp_dir, 'reports')
         generator = ReportGenerator(report_dir)
 
         assert os.path.exists(report_dir)
 
     def test_generate_markdown_report(self, temp_dir):
-        """Test generate_training_report tạo markdown"""
+        """Kiểm tra generate_training_report tạo markdown và nội dung cơ bản."""
         generator = ReportGenerator(temp_dir)
 
         all_metrics = {
@@ -334,7 +335,7 @@ class TestReportGenerator:
             assert '0.9200' in content  # F1 score
 
     def test_generate_json_report(self, temp_dir):
-        """Test generate_training_report tạo JSON"""
+        """Kiểm tra generate_training_report tạo JSON."""
         generator = ReportGenerator(temp_dir)
 
         all_metrics = {
@@ -352,7 +353,7 @@ class TestReportGenerator:
         assert report_path.endswith('.json')
 
     def test_generate_report_with_feature_importance(self, temp_dir):
-        """Test generate report với feature importance"""
+        """Kiểm tra generate report bao gồm feature importance khi có DataFrame."""
         generator = ReportGenerator(temp_dir)
 
         all_metrics = {'xgboost': {'f1': 0.92}}
@@ -375,7 +376,7 @@ class TestReportGenerator:
             assert 'feature_1' in content
 
     def test_generate_report_with_config(self, temp_dir, test_config):
-        """Test generate report với config summary"""
+        """Kiểm tra generate report bao gồm tóm tắt config nếu có."""
         generator = ReportGenerator(temp_dir)
 
         all_metrics = {'xgboost': {'f1': 0.92}}
@@ -391,4 +392,3 @@ class TestReportGenerator:
         with open(report_path, 'r', encoding='utf-8') as f:
             content = f.read()
             assert 'Configuration' in content
-

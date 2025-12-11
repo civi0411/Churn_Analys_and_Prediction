@@ -1,6 +1,15 @@
+"""
+tests/test_ops/reporting.py
+
+Smoke test import for reporting module.
+"""
+
 import pytest
-from src.ops.reporting import *
+import importlib
+
 
 def test_import_reporting():
-    # Test import thành công nếu module tồn tại
-    assert True
+    """Kiểm tra module `src.ops.reporting` import được thành công."""
+    reporting = importlib.import_module('src.ops.reporting')
+    # Basic smoke: module loaded
+    assert reporting is not None

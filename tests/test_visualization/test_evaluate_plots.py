@@ -1,6 +1,6 @@
 """
 tests/test_visualization/test_evaluate_plots.py
-Tests for src/visualization/evaluate_plots.py
+Các unit tests cho `EvaluateVisualizer` (evaluation plots).
 """
 import pytest
 import pandas as pd
@@ -11,17 +11,17 @@ from src.visualization.evaluate_plots import EvaluateVisualizer
 
 
 class TestEvaluateVisualizer:
-    """Test cases for EvaluateVisualizer class"""
+    """Các test cho `EvaluateVisualizer` (đồ thị đánh giá)."""
 
     def test_init(self, test_config, temp_artifacts_dir, mock_logger):
-        """Test khởi tạo EvaluateVisualizer"""
+        """Kiểm tra khởi tạo `EvaluateVisualizer` và thư mục lưu plots."""
         viz = EvaluateVisualizer(test_config, mock_logger, temp_artifacts_dir)
 
         assert viz.config == test_config
         assert os.path.exists(viz.eval_dir)
 
     def test_plot_confusion_matrix(self, test_config, temp_artifacts_dir, sample_train_test_split, trained_model):
-        """Test plot_confusion_matrix tạo plot"""
+        """Kiểm tra `plot_confusion_matrix` tạo file ảnh confusion matrix."""
         X_train, X_test, y_train, y_test = sample_train_test_split
         y_pred = trained_model.predict(X_test)
 
@@ -31,7 +31,7 @@ class TestEvaluateVisualizer:
         assert os.path.exists(os.path.join(viz.eval_dir, 'confusion_matrix_random_forest.png'))
 
     def test_plot_roc_curve(self, test_config, temp_artifacts_dir, sample_train_test_split, trained_model):
-        """Test plot_roc_curve tạo ROC curve"""
+        """Kiểm tra `plot_roc_curve` tạo ROC curve file."""
         X_train, X_test, y_train, y_test = sample_train_test_split
 
         from sklearn.metrics import roc_curve, roc_auc_score
@@ -49,7 +49,7 @@ class TestEvaluateVisualizer:
         assert os.path.exists(os.path.join(viz.eval_dir, 'roc_curve.png'))
 
     def test_plot_roc_curve_multiple_models(self, test_config, temp_artifacts_dir, sample_train_test_split):
-        """Test plot_roc_curve với nhiều models"""
+        """Kiểm tra `plot_roc_curve` cho nhiều mô hình cùng lúc."""
         from sklearn.linear_model import LogisticRegression
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.metrics import roc_curve, roc_auc_score
@@ -75,7 +75,7 @@ class TestEvaluateVisualizer:
         assert os.path.exists(os.path.join(viz.eval_dir, 'roc_curve.png'))
 
     def test_plot_feature_importance(self, test_config, temp_artifacts_dir, trained_model, sample_train_test_split):
-        """Test plot_feature_importance tạo bar chart"""
+        """Kiểm tra `plot_feature_importance` tạo bar chart top-N."""
         X_train, _, _, _ = sample_train_test_split
 
         importance_df = pd.DataFrame({
@@ -89,7 +89,7 @@ class TestEvaluateVisualizer:
         assert os.path.exists(os.path.join(viz.eval_dir, 'feature_importance_top_10.png'))
 
     def test_plot_feature_importance_empty_df(self, test_config, temp_artifacts_dir):
-        """Test plot_feature_importance với empty DataFrame"""
+        """Kiểm tra `plot_feature_importance` xử lý None / DataFrame rỗng an toàn."""
         viz = EvaluateVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
 
         # Should handle gracefully
@@ -97,7 +97,7 @@ class TestEvaluateVisualizer:
         viz.plot_feature_importance(pd.DataFrame())
 
     def test_plot_model_comparison(self, test_config, temp_artifacts_dir):
-        """Test plot_model_comparison tạo grouped bar chart"""
+        """Kiểm tra `plot_model_comparison` tạo grouped bar chart so sánh các mô hình."""
         metrics_dict = {
             'random_forest': {'accuracy': 0.95, 'f1': 0.92, 'recall': 0.90},
             'logistic_regression': {'accuracy': 0.88, 'f1': 0.85, 'recall': 0.82},
@@ -110,14 +110,14 @@ class TestEvaluateVisualizer:
         assert os.path.exists(os.path.join(viz.eval_dir, 'model_comparison.png'))
 
     def test_plot_model_comparison_empty(self, test_config, temp_artifacts_dir):
-        """Test plot_model_comparison với empty dict"""
+        """Kiểm tra `plot_model_comparison` xử lý dict trống an toàn."""
         viz = EvaluateVisualizer(test_config, run_specific_dir=temp_artifacts_dir)
 
         # Should handle gracefully
         viz.plot_model_comparison({}, ['accuracy'])
 
     def test_save_plot_format(self, test_config, temp_artifacts_dir, mock_logger):
-        """Test _save_plot lưu đúng format và log"""
+        """Kiểm tra `_save_plot` lưu file đúng và file không rỗng."""
         viz = EvaluateVisualizer(test_config, mock_logger, temp_artifacts_dir)
 
         metrics_dict = {
@@ -130,4 +130,3 @@ class TestEvaluateVisualizer:
 
         # Check file is actually a valid image
         assert os.path.getsize(saved_file) > 0
-

@@ -1,6 +1,8 @@
 """
 tests/conftest.py
-Shared fixtures for all tests
+
+Shared fixtures dùng chung cho toàn bộ test suite.
+Bao gồm cấu hình mẫu, data fixtures, temporary directories, và model fixtures.
 """
 import pytest
 import pandas as pd
@@ -22,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 @pytest.fixture(scope='session')
 def test_config():
-    """Config cơ bản cho testing"""
+    """Cấu hình mẫu dùng cho tests: data, preprocessing, tuning, models, artifacts."""
     return {
         'data': {
             'target_col': 'Churn',
@@ -69,7 +71,7 @@ def test_config():
 
 @pytest.fixture
 def sample_raw_df():
-    """Sample raw DataFrame cho testing"""
+    """Sample RAW DataFrame cho testing (mô phỏng dữ liệu e-commerce)."""
     np.random.seed(42)
     n_samples = 100
 
@@ -98,7 +100,7 @@ def sample_raw_df():
 
 @pytest.fixture
 def sample_raw_df_with_missing(sample_raw_df):
-    """Sample DataFrame với missing values"""
+    """Sample DataFrame có thêm missing values để test imputation."""
     df = sample_raw_df.copy()
     # Add missing values
     df.loc[0:5, 'Tenure'] = np.nan
@@ -109,7 +111,7 @@ def sample_raw_df_with_missing(sample_raw_df):
 
 @pytest.fixture
 def sample_processed_df():
-    """Sample processed DataFrame (numeric only)"""
+    """Sample processed DataFrame numeric-only dùng trong các test tính toán."""
     np.random.seed(42)
     n_samples = 100
 
@@ -136,7 +138,7 @@ def sample_processed_df():
 
 @pytest.fixture
 def sample_train_test_split(sample_processed_df):
-    """Split sample data into train/test"""
+    """Chia sample processed data thành train/test để dùng cho các model fixtures."""
     from sklearn.model_selection import train_test_split
 
     target_col = 'Churn'
@@ -154,7 +156,7 @@ def sample_train_test_split(sample_processed_df):
 
 @pytest.fixture
 def temp_dir():
-    """Tạo temp directory cho tests"""
+    """Tạo temp directory cho tests và xoá khi xong."""
     tmp = tempfile.mkdtemp()
     yield tmp
     shutil.rmtree(tmp, ignore_errors=True)
@@ -162,7 +164,7 @@ def temp_dir():
 
 @pytest.fixture
 def temp_artifacts_dir(temp_dir):
-    """Tạo artifacts structure trong temp"""
+    """Tạo cấu trúc artifacts (figures, models, experiments) trong temp_dir."""
     artifacts_dir = os.path.join(temp_dir, 'artifacts')
     os.makedirs(os.path.join(artifacts_dir, 'figures', 'eda'), exist_ok=True)
     os.makedirs(os.path.join(artifacts_dir, 'figures', 'evaluation'), exist_ok=True)
@@ -175,7 +177,7 @@ def temp_artifacts_dir(temp_dir):
 
 @pytest.fixture
 def trained_model(sample_train_test_split):
-    """Simple trained model for testing"""
+    """Một mô hình đơn giản đã train dùng cho test IOHandler và trainer."""
     from sklearn.ensemble import RandomForestClassifier
 
     X_train, X_test, y_train, y_test = sample_train_test_split
@@ -187,7 +189,7 @@ def trained_model(sample_train_test_split):
 
 @pytest.fixture
 def mock_logger():
-    """Mock logger for testing"""
+    """Mock logger đơn giản cho tests (logging basic)."""
     import logging
     logger = logging.getLogger('test_logger')
     logger.setLevel(logging.DEBUG)
@@ -198,13 +200,13 @@ def mock_logger():
 
 @pytest.fixture(scope='session')
 def tests_data_dir():
-    """Path to tests/data directory"""
+    """Đường dẫn tới thư mục `tests/data` để load sample files khi cần."""
     return os.path.join(os.path.dirname(__file__), 'data')
 
 
 @pytest.fixture(scope='session')
 def load_sample_raw_csv(tests_data_dir):
-    """Load sample_raw.csv nếu tồn tại"""
+    """Load `sample_raw.csv` nếu tồn tại trong tests/data."""
     path = os.path.join(tests_data_dir, 'sample_raw.csv')
     if os.path.exists(path):
         return pd.read_csv(path)
@@ -213,7 +215,7 @@ def load_sample_raw_csv(tests_data_dir):
 
 @pytest.fixture(scope='session')
 def load_sample_processed_csv(tests_data_dir):
-    """Load sample_processed.csv nếu tồn tại"""
+    """Load `sample_processed.csv` nếu tồn tại trong tests/data."""
     path = os.path.join(tests_data_dir, 'sample_processed.csv')
     if os.path.exists(path):
         return pd.read_csv(path)

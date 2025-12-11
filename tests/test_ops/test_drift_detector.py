@@ -1,3 +1,8 @@
+"""
+tests/test_ops/test_drift_detector.py
+
+Tests cho DataDriftDetector: schema drift, KS test cho numeric, Chi2 cho categorical.
+"""
 import pandas as pd
 import numpy as np
 import os
@@ -6,6 +11,7 @@ from src.ops.dataops.drift_detector import DataDriftDetector
 
 
 def test_schema_drift_detected():
+    """Kiểm tra phát hiện schema drift khi cột bị thiếu."""
     # reference with columns A,B
     ref = pd.DataFrame({'A': [1,2,3], 'B': [4,5,6]})
     new = pd.DataFrame({'A': [1,2,3]})  # missing B
@@ -19,6 +25,7 @@ def test_schema_drift_detected():
 
 
 def test_numerical_ks_detects_shift():
+    """Kiểm tra KS test phát hiện dịch chuyển phân phối numeric."""
     rng = np.random.RandomState(42)
     ref = pd.DataFrame({'x': rng.normal(0, 1, size=1000)})
     # shifted distribution
@@ -34,6 +41,7 @@ def test_numerical_ks_detects_shift():
 
 
 def test_categorical_chi2_detects_new_category():
+    """Kiểm tra Chi2 phát hiện category mới xuất hiện."""
     ref = pd.DataFrame({'cat': ['a'] * 80 + ['b'] * 20})
     new = pd.DataFrame({'cat': ['a'] * 50 + ['b'] * 30 + ['c'] * 20})
 
@@ -47,6 +55,7 @@ def test_categorical_chi2_detects_new_category():
 
 
 def test_detect_drift_handles_empty_reference_or_new():
+    """Kiểm tra hàm xử lý khi reference hoặc new rỗng."""
     ref = pd.DataFrame({'x': []})
     new = pd.DataFrame({'x': [1,2,3]})
     detector = DataDriftDetector(ref)

@@ -1,17 +1,22 @@
 """
-src/ops/mlops/monitoring.py
+Module `ops.mlops.monitoring` - ghi nhận hiệu năng mô hình và phát hiện drift hiệu năng.
 
-Model Monitor - Monitor performance and detect drift.
+Important keywords: Args, Methods, Returns
 """
 import os
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict
 from datetime import datetime
-from ...utils import IOHandler, ensure_dir
+from ...utils import ensure_dir
 
 
 class ModelMonitor:
-    """Monitor model performance in production."""
+    """
+    Monitor model performance in production.
+
+    Methods:
+        log_performance, get_performance_history, detect_drift, create_alert, check_health
+    """
 
     def __init__(self, base_dir: str = "artifacts/monitoring"):
         self.base_dir = base_dir
@@ -28,7 +33,7 @@ class ModelMonitor:
     def log_performance(self, model_name: str, metrics: Dict[str, float],
                         model_version: str = None, n_samples: int = None,
                         notes: str = None):
-        """Log model performance."""
+        """Ghi nhận hiệu năng mô hình."""
         new_row = pd.DataFrame([{
             "timestamp": datetime.now().isoformat(),
             "model_name": model_name,
@@ -56,7 +61,7 @@ class ModelMonitor:
             print(f"Error logging performance: {e}")
 
     def get_performance_history(self, model_name: str = None) -> pd.DataFrame:
-        """Get performance history."""
+        """Lấy lịch sử hiệu năng."""
         if not os.path.exists(self.performance_log):
             return pd.DataFrame()
 
@@ -69,7 +74,7 @@ class ModelMonitor:
 
     def detect_drift(self, model_name: str, metric: str = "f1",
                      threshold: float = 0.05) -> Dict:
-        """Detect performance drift."""
+        """Phát hiện drift hiệu năng."""
         history = self.get_performance_history(model_name)
 
         if len(history) < 2:
@@ -95,9 +100,9 @@ class ModelMonitor:
 
     def create_alert(self, model_name: str, alert_type: str,
                      message: str, severity: str = "WARNING") -> None:
-        """Create alert when issue detected."""
-        alerts_dir = os.path.join(self.base_dir, "alerts")
-        ensure_dir(alerts_dir)
+        """Tạo cảnh báo khi phát hiện sự cố."""
+        # Chỉ ghi alert vào alerts_log.csv trong base_dir (không tạo file JSON riêng)
+        ensure_dir(self.base_dir)
 
         alert = {
             "timestamp": datetime.now().isoformat(),
@@ -107,29 +112,27 @@ class ModelMonitor:
             "message": message
         }
 
-        alert_file = os.path.join(
-            alerts_dir,
-            f"alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        )
-        IOHandler.save_json(alert, alert_file)
-
         alerts_log = os.path.join(self.base_dir, "alerts_log.csv")
         new_row = pd.DataFrame([alert])
 
         try:
             if os.path.exists(alerts_log):
                 df = pd.read_csv(alerts_log)
-                df = pd.concat([df, new_row], ignore_index=True)
+                if df.empty:
+                    df = new_row
+                else:
+                    df = pd.concat([df, new_row], ignore_index=True)
             else:
                 df = new_row
             df.to_csv(alerts_log, index=False)
         except Exception as e:
+            # Use print for now (no logger attached) but keep message concise
             print(f"Error logging alert: {e}")
 
     def check_health(self, model_name: str, current_metrics: Dict[str, float],
                      baseline_metrics: Dict[str, float] = None,
                      thresholds: Dict[str, float] = None) -> Dict:
-        """Check model health."""
+        """Kiểm tra sức khỏe mô hình."""
         if thresholds is None:
             thresholds = {
                 "f1_min": 0.70,
@@ -147,12 +150,12 @@ class ModelMonitor:
                 if metric_name in current_metrics:
                     if current_metrics[metric_name] < threshold:
                         issues.append(
-                            f"{metric_name.upper()} below threshold: "
+                            f"{metric_name.upper()} dưới ngưỡng tối thiểu: "
                             f"{current_metrics[metric_name]:.3f} < {threshold}"
                         )
                         status = "WARNING"
                         recommendations.append(
-                            "Consider retraining with more data or feature engineering"
+                            "Xem xét việc huấn luyện lại với nhiều dữ liệu hơn hoặc kỹ thuật tạo đặc trưng"
                         )
 
         if baseline_metrics:
@@ -160,14 +163,14 @@ class ModelMonitor:
                 if metric in current_metrics and metric in baseline_metrics:
                     drift = abs(current_metrics[metric] - baseline_metrics[metric])
                     if drift > thresholds.get("drift_max", 0.10):
-                        issues.append(f"{metric.upper()} drift detected: {drift:.3f}")
+                        issues.append(f"Phát hiện drift {metric.upper()}: {drift:.3f}")
                         status = "CRITICAL" if drift > 0.15 else "WARNING"
-                        recommendations.append("Model drift detected. Retrain recommended.")
+                        recommendations.append("Phát hiện drift mô hình. Khuyến nghị huấn luyện lại.")
 
                         self.create_alert(
                             model_name=model_name,
                             alert_type="drift",
-                            message=f"{metric.upper()} drift: {drift:.3f}",
+                            message=f"Drift {metric.upper()}: {drift:.3f}",
                             severity="CRITICAL" if drift > 0.15 else "WARNING"
                         )
 

@@ -1,3 +1,11 @@
+"""
+tests/test_data/test_transformer.py
+
+Các unit test cho `DataTransformer`.
+Mục tiêu: kiểm tra `fit_transform`, `transform` và factory resampler.
+
+Important keywords: Args, Returns, Notes
+"""
 import pytest
 import pandas as pd
 
@@ -19,7 +27,12 @@ def make_config():
 
 
 def test_fit_transform_and_transform(sample_raw_df, mock_logger):
-    """Fit on training data and transform test data; check learned params and output shapes."""
+    """Fit trên training và transform dữ liệu test; kiểm tra learned params và kích thước output.
+
+    Args:
+        sample_raw_df: fixture chứa DataFrame mẫu
+        mock_logger: fixture logger giả
+    """
     cfg = make_config()
     transformer = DataTransformer(cfg, mock_logger)
 
@@ -46,7 +59,7 @@ def test_fit_transform_and_transform(sample_raw_df, mock_logger):
 
 
 def test_get_resampler(sample_raw_df, mock_logger):
-    """Test get_resampler returns expected object or None depending on imblearn availability."""
+    """Kiểm tra `get_resampler` trả về resampler khi `imblearn` có sẵn, ngược lại trả None."""
     cfg = make_config()
     cfg['preprocessing']['use_smote'] = True
     transformer = DataTransformer(cfg, mock_logger)

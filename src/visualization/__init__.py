@@ -1,9 +1,8 @@
-"""
-src/visualization/__init__.py
+"""Gói visualization: các tiện ích vẽ biểu đồ.
 
-Visualization Module - Tạo biểu đồ.
-    - EDAVisualizer: Biểu đồ phân tích dữ liệu
-    - EvaluateVisualizer: Biểu đồ đánh giá model
+Cung cấp lớp:
+- EDAVisualizer
+- EvaluateVisualizer
 """
 from .eda_plots import EDAVisualizer
 from .evaluate_plots import EvaluateVisualizer

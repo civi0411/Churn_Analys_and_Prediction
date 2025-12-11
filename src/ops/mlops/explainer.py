@@ -1,14 +1,19 @@
 """
-src/ops/mlops/explainer.py
+Module `ops.mlops.explainer` - ModelExplainer (SHAP + feature importance helpers).
 
-Model Explainer - SHAP and Feature Importance.
+Important keywords: Args, Methods, Returns, Notes
 """
 import pandas as pd
 from typing import List, Optional
 
 
 class ModelExplainer:
-    """Model Explainability - SHAP and Feature Importance."""
+    """
+    Giúp tạo giải thích mô hình (feature importance, SHAP).
+
+    Methods:
+        get_feature_importance(top_n), explain_with_shap(X_sample, save_path)
+    """
 
     def __init__(self, model, X_train, feature_names: List[str], logger=None):
         self.logger = logger
@@ -38,10 +43,10 @@ class ModelExplainer:
             self._train_medians = {}
 
     def get_feature_importance(self, top_n: int = 20) -> Optional[pd.DataFrame]:
-        """Get feature importance from model."""
+        """Lấy độ quan trọng của các đặc trưng từ mô hình."""
         if not hasattr(self.model, "feature_importances_"):
             if self.logger:
-                self.logger.warning("Model does not have feature_importances_")
+                self.logger.warning("Mô hình không có thuộc tính feature_importances_")
             return None
 
         importance_df = pd.DataFrame({
@@ -52,7 +57,7 @@ class ModelExplainer:
         return importance_df
 
     def explain_with_shap(self, X_sample, save_path: str = None) -> bool:
-        """Generate SHAP explanations."""
+        """Tạo giải thích SHAP."""
         try:
             import shap
             import matplotlib.pyplot as plt
@@ -60,7 +65,7 @@ class ModelExplainer:
             import warnings
 
             if self.logger:
-                self.logger.info("Generating SHAP explanations...")
+                self.logger.info("Đang tạo giải thích SHAP...")
 
             shap_values = None
             X_sample_clean = None
@@ -201,7 +206,7 @@ class ModelExplainer:
 
             if shap_values is None:
                 if self.logger:
-                    self.logger.warning("  Could not compute SHAP values")
+                    self.logger.warning("  Không thể tính toán giá trị SHAP")
                 return False
 
             # Plot - suppress known FutureWarning from SHAP about RNG seeding

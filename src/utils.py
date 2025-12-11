@@ -1,7 +1,12 @@
 """
-src/utils.py
-Utility functions: Logging, IO, Hashing, Config, Filename parsing
+Tiện ích chung (utils) cho dự án: IO, logging, config, helper.
+
+Tóm tắt:
+- Chứa các hàm phục vụ file I/O, quản lý thời gian, seed, và ConfigLoader/Logger.
+
+Important keywords: Args, Returns, Raises, Notes, Class
 """
+
 import os, sys, yaml, json, logging, joblib, pickle, random, glob
 import hashlib
 from datetime import datetime
@@ -14,30 +19,43 @@ import pandas as pd
 # ===================== Helper functions =====================
 
 def ensure_dir(dir_path: str) -> None:
-    """Create directory if not exists. Ignore empty path."""
+    """Tạo thư mục nếu chưa tồn tại.
+
+    Args:
+        dir_path (str): Đường dẫn thư mục (bỏ qua nếu rỗng).
+    """
     if not dir_path:
         return
     os.makedirs(dir_path, exist_ok=True)
 
 
 def set_random_seed(seed: int = 42) -> None:
-    """Set random seed for reproducibility."""
+    """Đặt seed cho random và numpy để tái tạo kết quả.
+
+    Args:
+        seed (int): Giá trị seed.
+    """
     random.seed(seed)
     np.random.seed(seed)
 
 
 def get_timestamp() -> str:
-    """Return current timestamp as YYYYMMDD_HHMMSS."""
+    """Trả về timestamp theo format YYYYMMDD_HHMMSS.
+
+    Returns:
+        str: timestamp hiện tại.
+    """
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 def extract_base_filename(file_path: str) -> str:
-    """
-    Extract base filename without extension.
+    """Lấy tên file không phần mở rộng (basename).
 
-    Example:
-        'data/raw/E Commerce Dataset.xlsx' -> 'E Commerce Dataset'
-        'data/raw/customers.csv' -> 'customers'
+    Args:
+        file_path (str): Đường dẫn file.
+
+    Returns:
+        str: Base filename (without extension).
     """
     return Path(file_path).stem
 
