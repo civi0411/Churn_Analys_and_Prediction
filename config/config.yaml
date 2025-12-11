@@ -2,129 +2,129 @@
 # DATA CONFIGURATION
 # ========================
 data:
-  target_col: "Churn"
-  date_col: "DaySinceLastOrder"
-  base_dir: "data"
-  raw_path: "data/raw/E Commerce Dataset.xlsx"
-  sheet_name: "E Comm"
-  processed_dir: "data/processed"
-  train_test_dir: "data/train_test"
-  test_size: 0.2
-  random_state: 42
+  target_col: "Churn"         # Dùng cho train/test, transform, split
+  date_col: "DaySinceLastOrder" # Dùng cho feature engineering
+  base_dir: "data"            # Đường dẫn dữ liệu
+  raw_path: "data/raw/E Commerce Dataset.xlsx" # Đường dẫn file gốc
+  sheet_name: "E Comm"        # Tên sheet Excel
+  processed_dir: "data/processed" # Thư mục dữ liệu đã xử lý
+  train_test_dir: "data/train_test" # Thư mục train/test
+  test_size: 0.2               # Tỷ lệ test (0.0 - 1.0)
+  random_state: 42             # Seed cho random
 
 # ========================
 # OPS
 # ========================
 dataops:
-  versions_dir: "artifacts/versions"
+  versions_dir: "artifacts/versions" # Quản lý version dữ liệu
   drift_detection:
-    enabled: true                    # Bật/tắt drift check
-    pvalue_threshold: 0.05           # Ngưỡng p-value cho statistical tests
-    max_drift_ratio: 0.2             # Tỷ lệ drift tối đa chấp nhận được (20%)
-    abort_on_critical: true          # Hủy prediction nếu CRITICAL drift
-    sample_frac: 1.0                 # Tỷ lệ sample dữ liệu (1.0 = 100%)
-    max_rows: null                   # Giới hạn số dòng check (null = không giới hạn)
+    enabled: true                    # Bật/tắt kiểm tra drift
+    pvalue_threshold: 0.05           # Ngưỡng kiểm tra drift
+    max_drift_ratio: 0.2             # Tỷ lệ drift tối đa
+    abort_on_critical: true          # Hủy nếu drift lớn
+    sample_frac: 1.0                 # Tỷ lệ sample
+    max_rows: null                   # Giới hạn số dòng
   business_rules:
-    persist: true
-    fail_on_violation: false
+    persist: true                    # Lưu báo cáo rules
+    fail_on_violation: false         # Dừng nếu vi phạm rules
 
 mlops:
-  registry_dir: "artifacts/registry"
+  registry_dir: "artifacts/registry" # Lưu trạng thái transformer, model
 
 # ========================
 # TRACKING & MONITORING
 # ========================
 experiments:
-  enabled: true
-  base_dir: "artifacts/experiments"
+  enabled: true                      # Bật/tắt tracking
+  base_dir: "artifacts/experiments" # Thư mục tracking
 
 monitoring:
-  enabled: true
-  base_dir: "artifacts/monitoring"
+  enabled: true                      # Bật/tắt monitoring
+  base_dir: "artifacts/monitoring"  # Thư mục monitoring
   health_check:
-    f1_min: 0.70
-    accuracy_min: 0.75
-    drift_max: 0.10
+    f1_min: 0.70                     # Ngưỡng F1
+    accuracy_min: 0.75               # Ngưỡng accuracy
+    drift_max: 0.10                  # Ngưỡng drift
 
 explainability:
-  enabled: true
-  methods: ["shap"]
-  shap_samples: 100
+  enabled: true                      # Bật/tắt SHAP
+  methods: ["shap"]                 # Chỉ hỗ trợ shap
+  shap_samples: 100                  # Số sample cho SHAP
 
 # ========================
 # PREPROCESSING CONFIG
 # ========================
 preprocessing:
   clean:
-    remove_duplicates: true
-    standardize_values: true
+    remove_duplicates: true          # Xóa dòng trùng
+    standardize_values: true         # Chuẩn hóa tên cột
   missing_strategy:
-    numerical: "median"
-    categorical: "mode"
-  outlier_method: "iqr"
-  outlier_threshold: 1.5
-  scaler_type: "standard"
-  categorical_encoding: "label"
-  create_features: true
-  feature_selection: true
-  feature_selection_method: "f_classif"
-  n_top_features: 15
-  use_smote: true
-  k_neighbors: 5
-  use_tomek: true
+    numerical: "median"              # median hoặc mean
+    categorical: "mode"              # mode hoặc unknown
+  outlier_method: "iqr"              # iqr hoặc zscore
+  outlier_threshold: 1.5             # Ngưỡng cho iqr (thường 1.5) hoặc zscore (thường 3.0)
+  scaler_type: "standard"            # standard, minmax, robust
+  categorical_encoding: "label"      # Chỉ hỗ trợ label
+  create_features: true              # Tạo feature domain
+  feature_selection: true            # Bật chọn đặc trưng
+  feature_selection_method: "f_classif" # f_classif hoặc mutual_info
+  n_top_features: 15                 # Số lượng feature chọn
+  use_smote: true                    # Bật SMOTE
+  k_neighbors: 5                     # Số k cho SMOTE
+  use_tomek: true                    # Bật SMOTETomek
 
 # ========================
 # MODEL CONFIGURATIONS
 # ========================
 models:
   logistic_regression:
-    C: [0.001, 0.01, 0.1, 1, 10]
-    penalty: ["l2"]
-    solver: ["lbfgs", "liblinear"]
-    max_iter: [1000]
+    C: [0.001, 0.01, 0.1, 1, 10]    # Các giá trị để tuning
+    penalty: ["l2"]                 # Chỉ l2
+    solver: ["lbfgs", "liblinear"]  # Các solver
+    max_iter: [1000]                 # Số vòng lặp
 
   svm:
-    C: [0.1, 1, 10]
-    kernel: ["rbf", "linear"]
-    gamma: ["scale", "auto"]
-    probability: [true]
+    C: [0.1, 1, 10]                  # Các giá trị để tuning
+    kernel: ["rbf", "linear"]        # kernel rbf hoặc linear
+    gamma: ["scale", "auto"]         # gamma scale hoặc auto
+    probability: [true]              # Dự đoán xác suất
 
   decision_tree:
-    max_depth: [6, 10, 16, null]
-    min_samples_split: [2, 5, 10]
-    min_samples_leaf: [1, 2, 4]
+    max_depth: [6, 10, 16, null]     # Độ sâu cây
+    min_samples_split: [2, 5, 10]    # Số mẫu split
+    min_samples_leaf: [1, 2, 4]      # Số mẫu leaf
 
   random_forest:
-    n_estimators: [50, 100, 200]
-    max_depth: [10, 20, null]
-    min_samples_split: [2, 5]
-    min_samples_leaf: [1, 2]
+    n_estimators: [50, 100, 200]     # Số cây
+    max_depth: [10, 20, null]        # Độ sâu cây
+    min_samples_split: [2, 5]        # Số mẫu split
+    min_samples_leaf: [1, 2]         # Số mẫu leaf
 
   xgboost:
-    n_estimators: [100, 300, 500]
-    max_depth: [3, 5, 7]
-    learning_rate: [0.01, 0.05, 0.1]
-    eval_metric: ["logloss"]
+    n_estimators: [100, 300, 500]    # Số cây
+    max_depth: [3, 5, 7]             # Độ sâu cây
+    learning_rate: [0.01, 0.05, 0.1] # Tốc độ học
+    eval_metric: ["logloss"]         # Chỉ logloss
 
   adaboost:
-    n_estimators: [50, 100]
-    learning_rate: [0.01, 0.1, 1.0]
+    n_estimators: [50, 100]          # Số cây
+    learning_rate: [0.01, 0.1, 1.0]  # Tốc độ học
 
 # ========================
 # HYPERPARAMETER TUNING
 # ========================
 tuning:
-  method: "randomized"
-  cv_folds: 5
-  cv_strategy: "stratified"
-  n_iter: 20
-  scoring: "f1"
-  n_jobs: -1
+  method: "randomized"               # randomized hoặc grid
+  cv_folds: 5                        # Số fold cho CV
+  cv_strategy: "stratified"          # Chiến lược CV
+  n_iter: 20                         # Số lần lặp
+  scoring: "f1"                      # Tiêu chí đánh giá
+  n_jobs: -1                         # Số job
 
 # ========================
 # LOGGING (Simplified)
 # ========================
 logging:
-  level: "INFO"
-  dir: "artifacts/logs"
-  format: "[%(asctime)s] | %(levelname)-7s | %(name)-15s | %(message)s"
+  level: "INFO"                      # Mức log
+  dir: "artifacts/logs"              # Thư mục log
+  format: "[%(asctime)s] | %(levelname)-7s | %(name)-15s | %(message)s" # Định dạng log

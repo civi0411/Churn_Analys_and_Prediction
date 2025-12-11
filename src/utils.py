@@ -342,16 +342,14 @@ class ConfigLoader:
 
 # ===================== Logger với Filtering =====================
 
-class SystemLogFilter:
+class SystemLogFilter(logging.Filter):
     """
     Filter cho SYSTEM LOG (artifacts/logs/):
     - Ghi tất cả DEBUG (chi tiết kỹ thuật)
     - Ghi tất cả WARNING và ERROR
     - Chỉ ghi INFO cho các milestone quan trọng (tiêu đề các stage)
-
-    Mục đích: Log kỹ thuật chi tiết cho dev/debug
     """
-    @staticmethod
+
     def filter(self, record):
         msg = record.getMessage()
 
@@ -694,12 +692,20 @@ class IOHandler:
             try:
                 if sheet_name is not None:
                     try:
-                        return pd.read_excel(file_path, sheet_name=sheet_name)
+                        result = pd.read_excel(file_path, sheet_name=sheet_name)
+                        if isinstance(result, dict):
+                            return next(iter(result.values()))
+                        return result
                     except Exception:
-                        # Nếu sheet_name không tồn tại, đọc sheet đầu tiên
-                        return pd.read_excel(file_path, sheet_name=0)
+                        result = pd.read_excel(file_path, sheet_name=0)
+                        if isinstance(result, dict):
+                            return next(iter(result.values()))
+                        return result
                 else:
-                    return pd.read_excel(file_path, sheet_name=0)
+                    result = pd.read_excel(file_path, sheet_name=0)
+                    if isinstance(result, dict):
+                        return next(iter(result.values()))
+                    return result
             except Exception as e:
                 raise IOError(f"Error reading file {file_path}: {e}") from e
         elif ext == '.csv':

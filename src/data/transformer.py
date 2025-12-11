@@ -301,7 +301,7 @@ class DataTransformer:
 
     def _handle_outliers(self, df: pd.DataFrame, is_training: bool) -> pd.DataFrame:
         """
-        Giảm ảnh hưởng outliers bằng clipping theo IQR.
+        Giảm ảnh hưởng outliers bằng clipping theo IQR hoặc Z-score.
 
         Args:
             df (pd.DataFrame): Input DataFrame
@@ -311,16 +311,16 @@ class DataTransformer:
             pd.DataFrame: DataFrame sau clipping
 
         Config:
-            preprocessing.outlier_method: 'iqr' (hiện chỉ hỗ trợ IQR)
-            preprocessing.outlier_threshold: float (default 1.5)
+            preprocessing.outlier_method: 'iqr' hoặc 'zscore'
+            preprocessing.outlier_threshold: float (default 1.5 cho IQR, ví dụ 3.0 cho zscore)
 
         Notes:
-            - Lưu (lower, upper) cho mỗi cột số vào `_learned_params['outliers']` khi is_training=True.
+            - Lưu (lower, upper) cho mỗi cột số vào `_learned_params['outliers']` khi is_training=True (IQR).
+            - Với zscore, không cần lưu state, chỉ dùng mean/std của tập hiện tại.
         """
         method = self.pp.get('outlier_method', 'iqr')
         threshold = self.pp.get('outlier_threshold', 1.5)
 
-        # Chỉ hỗ trợ IQR cho pipeline production an toàn (các method khác như IsolationForest thường dùng filter dòng, khó áp dụng transform)
         if method == 'iqr':
             for col in self.numerical_cols:
                 if col not in df.columns: continue
@@ -336,6 +336,15 @@ class DataTransformer:
                 elif col in self._learned_params['outliers']:
                     lower, upper = self._learned_params['outliers'][col]
                     df[col] = df[col].clip(lower=lower, upper=upper)
+        elif method == 'zscore':
+            for col in self.numerical_cols:
+                if col not in df.columns: continue
+                mean = df[col].mean()
+                std = df[col].std()
+                if std == 0: continue
+                z = (df[col] - mean) / std
+                # Clip các giá trị vượt quá ngưỡng zscore
+                df[col] = df[col].where(z.abs() <= threshold, mean)
         return df
 
     def _encode_categorical(self, df: pd.DataFrame, is_training: bool) -> pd.DataFrame:
