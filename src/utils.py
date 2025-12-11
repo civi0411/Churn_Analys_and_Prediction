@@ -14,6 +14,18 @@ from pathlib import Path
 from typing import Any, Dict, Tuple, cast
 import numpy as np
 import pandas as pd
+import re
+
+# Simple state to record last system message (global) to avoid duplicate separators across modules
+_last_system_message: Dict[str, str] = {}
+_last_system_message_global: str = ""
+
+# Module-level logging format constants (used by get_logger and _add_run_handler)
+LOG_FILE_TIME_FMT = "%Y-%m-%d %H:%M:%S"
+LOG_CONSOLE_TIME_FMT = "%H:%M:%S"
+LOG_SYSTEM_FMT = "[%(asctime)s] | %(levelname)-7s | %(name)-15s | %(message)s"
+LOG_RUN_FMT = "[%(asctime)s] | %(levelname)-7s | %(message)s"
+LOG_CONSOLE_FMT = "[%(asctime)s] | %(levelname)-7s | %(message)s"
 
 
 # ===================== Helper functions =====================
@@ -307,67 +319,222 @@ class ConfigLoader:
 
 # ===================== Logger =====================
 
-# ===================== Logger với Filtering =====================
 
 # ===================== Logger với Filtering =====================
 
 class SystemLogFilter:
-    """Filter cho System Log - giữ các milestone INFO + WARNING/ERROR"""
+    """
+    Filter cho SYSTEM LOG (artifacts/logs/):
+    - Ghi tất cả DEBUG (chi tiết kỹ thuật)
+    - Ghi tất cả WARNING và ERROR
+    - Chỉ ghi INFO cho các milestone quan trọng (tiêu đề các stage)
+
+    Mục đích: Log kỹ thuật chi tiết cho dev/debug
+    """
 
     def filter(self, record):
         msg = record.getMessage()
 
-        # Keep all warnings and errors
-        if record.levelno >= logging.WARNING:
+        # Keep all DEBUG, WARNING, ERROR, CRITICAL
+        if record.levelno in (logging.DEBUG, logging.WARNING, logging.ERROR, logging.CRITICAL):
             return True
 
         # Allow DEBUG records in system log (for diagnostics)
         if record.levelno == logging.DEBUG:
             return True
 
-        # For INFO level, only allow important milestone messages
+        # For INFO: chỉ giữ các milestone/stage headers
         if record.levelno == logging.INFO:
-            important_keywords = [
-                'Report Generated',
-                'Model Registry',
-                'SHAP Plot',
-                'Saved Plot',
-                'Saved:',
-                'TRAINING RESULTS',
-                'BEST MODEL',
-                'STAGE:',
-                'Pipeline',
-                'Completed',
+            milestone_keywords = [
+                'STAGE:',  # Các giai đoạn pipeline
+                'Pipeline',  # Khởi tạo/kết thúc pipeline
+                'Initialized',  # Component initialization
+                'Completed',  # Stage completion
+                '=' * 60,  # Separator lines (headers)
+                '=' * 70,
             ]
-            try:
-                return any(kw in msg for kw in important_keywords)
-            except Exception:
-                return False
+            return any(kw in msg for kw in milestone_keywords)
 
         return False
 
 
-class RunLogFilter(logging.Filter):
-    """Filter cho Run Log - chỉ ghi INFO level cho user"""
+class SystemMsgCleaner(logging.Filter):
+    """Normalize system log messages: strip, collapse blank lines, standardize separators,
+    and drop consecutive duplicates to avoid lines with '=' when no content."""
 
     def filter(self, record):
-        return record.levelno >= logging.INFO
+        try:
+            msg = str(record.getMessage())
+            # Collapse multiple newlines and trim
+            msg = re.sub(r"\n\s*\n+", "\n", msg)
+            msg = msg.strip()
+
+            # Standardize separator-only messages to a canonical length
+            if re.fullmatch(r"=+", msg):
+                # choose 70-character separator
+                msg = '=' * 70
+
+            # If message empty after cleaning, skip
+            if not msg:
+                return False
+
+            # Deduplicate consecutive same messages (global) to avoid repeated separators
+            global _last_system_message_global
+            if _last_system_message_global == msg:
+                return False
+            _last_system_message_global = msg
+
+            # Replace the record message with cleaned version (keeps exc_info elsewhere)
+            record.msg = msg
+            record.args = ()
+            return True
+        except Exception:
+            return True
+
+
+class RunLogFilter(logging.Filter):
+    """
+    Filter cho RUN LOG (artifacts/experiments/<run_id>/run.log):
+    - Ghi tất cả INFO (báo cáo tiến trình chi tiết)
+    - Ghi WARNING với thông điệp rút gọn
+    - Ghi ERROR với message chuyển hướng đến system log
+
+    Mục đích: Báo cáo dễ đọc cho người dùng
+    """
+
+    IMPORTANT_INFO_KEYWORDS = [
+        # === STAGE HEADERS ===
+        '=' * 60,
+        '=' * 70,
+        'STAGE:',
+        'PIPELINE',
+
+        # === DATA OPERATIONS ===
+        'Loaded data:',
+        'Data Version',
+        'Split:',
+        'Saved:',
+        'Data Quality',
+
+        # === MODEL OPERATIONS ===
+        'TRAINING RUN',
+        'BEST MODEL:',
+        '[EVALUATION]',
+        'Model Registry',
+        'Model Health:',
+
+        # === VISUALIZATION ===
+        'EDA Complete',
+        'Visualization Completed',
+
+        # === RESULTS ===
+        'TRAINING RESULTS',
+        'Best Model',
+        'F1 Score',
+        'ROC-AUC',
+        'Accuracy',
+        '[SUCCESS]',
+
+        # === PREDICTIONS ===
+        'Prediction saved:',
+        'CRITICAL DRIFT',
+
+        # === REPORTS ===
+        'Report Generated',
+    ]
+
+    def filter(self, record):
+        msg = record.getMessage()
+        # === INFO: Chỉ ghi các actions quan trọng ===
+        if record.levelno == logging.INFO:
+            # Skip only clearly technical/irrelevant INFO
+            skip_patterns = [
+                'run_specific_dir not set',  # Internal warnings
+                'Transformer State',  # Technical artifact saving
+            ]
+
+            if any(pattern in msg for pattern in skip_patterns):
+                return False
+
+            # Allow most INFO messages for run log (user-facing), keep it comprehensive
+            return True
+
+        # === WARNING: Rút gọn message ===
+        if record.levelno == logging.WARNING:
+            # Skip technical warnings
+            if 'TreeExplainer' in msg or 'KernelExplainer' in msg:
+                return False
+            # Keep business warnings
+            return True
+
+        # For ERROR/CRITICAL: thay message thành 1 dòng redirect message that points to latest system log
+        if record.levelno >= logging.ERROR:
+            try:
+                sys_path = getattr(Logger, '_latest_system_log', None) or 'artifacts/logs/'
+                sys_path = os.path.abspath(sys_path)
+                # Single-line redirect message
+                record.msg = f"ERROR | Hệ thống gặp lỗi và không thể chạy tiếp. Xem: {sys_path}"
+                record.args = ()  # Clear args to use modified msg
+                # Remove exception traceback from run log (we redirect users to system log)
+                if hasattr(record, 'exc_info'):
+                    record.exc_info = None
+                if hasattr(record, 'exc_text'):
+                    record.exc_text = None
+            except Exception:
+                record.msg = "ERROR | Hệ thống gặp lỗi và không thể chạy tiếp. Xem system log."
+                record.args = ()
+            return True
+
+        return False
 
 
 class Logger:
+    """
+        2-Tier Logging System:
+
+        Tier 1 - SYSTEM LOG (artifacts/logs/MAIN_<timestamp>.log):
+            - Mục đích: Chi tiết kỹ thuật đầy đủ cho debugging
+            - Nội dung:
+              + Tất cả DEBUG messages
+              + Tất cả WARNING/ERROR/CRITICAL
+              + INFO chỉ cho milestone (tiêu đề stages)
+            - Format: [timestamp] | LEVEL | MODULE | message
+            - Audience: Developers, Technical debugging
+
+        Tier 2 - RUN LOG (artifacts/experiments/<run_id>/run.log):
+            - Mục đích: Báo cáo tiến trình dễ đọc cho người dùng
+            - Nội dung:
+              + Tất cả INFO messages (chi tiết hoạt động)
+              + WARNING messages
+              + ERROR chỉ hiện message chuyển hướng
+            - Format: [timestamp] | LEVEL | message
+            - Audience: End users, Data scientists
+
+        Usage:
+            logger = Logger.get_logger('MAIN', log_dir='artifacts/logs')
+            logger.info("Processing data...")  # Vào cả 2 logs
+            logger.debug("Variable x = 5")     # Chỉ vào system log
+            logger.error("Connection failed")  # System: full detail, Run: redirect message
+        """
     _loggers: Dict[str, logging.Logger] = {}
 
     @classmethod
     def get_logger(cls, name: str, log_dir: str = None,
                    level: str = "INFO", run_log_path: str = None) -> logging.Logger:
         """
-        Tạo logger với handlers:
-        1. Console: INFO+
-        2. System Log: Filtered INFO + WARNING+
-        3. Run Log: INFO only (clean)
+        Tạo logger với 2-tier architecture.
+
+        Args:
+            name: Tên logger (thường là 'MAIN')
+            log_dir: Thư mục system logs (default: 'artifacts/logs')
+            level: Log level (default: 'INFO')
+            run_log_path: Đường dẫn run log (optional, set sau khi start run)
+
+        Returns:
+            logging.Logger: Configured logger instance
         """
 
-        # Default log_dir from config if available
+        # Default log_dir
         if log_dir is None:
             log_dir = "artifacts/logs"
 
@@ -375,7 +542,7 @@ class Logger:
         if name in cls._loggers:
             logger = cls._loggers[name]
             if run_log_path:
-                cls._add_run_handler(logger, run_log_path)
+                cls._add_run_handler(logger, run_log_path)  # Nếu có run_log_path mới, add handler
             return logger
 
         ensure_dir(log_dir)
@@ -385,31 +552,41 @@ class Logger:
         if logger.hasHandlers():
             logger.handlers.clear()
 
-        # Formatter
-        full_formatter = logging.Formatter(
-            "[%(asctime)s] | %(levelname)-7s | %(name)-10s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        # System log: Full technical format (include logger name/module)
+        system_formatter = logging.Formatter(LOG_SYSTEM_FMT, datefmt=LOG_FILE_TIME_FMT)
 
-        run_formatter = logging.Formatter(
-            "[%(asctime)s] | %(levelname)-7s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        # Run log: User-friendly format (no module name)
+        run_formatter = logging.Formatter(LOG_RUN_FMT, datefmt=LOG_FILE_TIME_FMT)
+
+        # Console: short time, aligned level
+        console_formatter = logging.Formatter(LOG_CONSOLE_FMT, datefmt=LOG_CONSOLE_TIME_FMT)
 
         # === HANDLER 1: CONSOLE ===
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(full_formatter)
+        console_handler.setFormatter(console_formatter)
+        # Normalize console output similarly to system logs
+        console_handler.addFilter(SystemMsgCleaner())
         logger.addHandler(console_handler)
 
         # === HANDLER 2: SYSTEM LOG ===
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        global_log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
-        global_file_handler = logging.FileHandler(global_log_file, encoding="utf-8")
-        global_file_handler.setLevel(logging.DEBUG)
-        global_file_handler.setFormatter(full_formatter)
-        global_file_handler.addFilter(SystemLogFilter())
-        logger.addHandler(global_file_handler)
+        system_log_file = os.path.join(log_dir, f"{name}_{timestamp}.log")
+
+        # Use utf-8-sig so PowerShell/Windows tools display unicode characters correctly
+        system_file_handler = logging.FileHandler(system_log_file, encoding="utf-8-sig")
+        system_file_handler.setLevel(logging.DEBUG)  # Capture all
+        system_file_handler.setFormatter(system_formatter)
+        # Attach cleaner first so messages are normalized before milestone filtering
+        system_file_handler.addFilter(SystemMsgCleaner())  # Attach message cleaner
+        system_file_handler.addFilter(SystemLogFilter())
+        logger.addHandler(system_file_handler)
+
+        # Record latest system log path for run-log redirect messages
+        try:
+            cls._latest_system_log = system_log_file
+        except Exception:
+            pass
 
         # === HANDLER 3: RUN LOG ===
         if run_log_path:
@@ -420,7 +597,13 @@ class Logger:
 
     @classmethod
     def _add_run_handler(cls, logger: logging.Logger, run_log_path: str):
-        """Thêm handler cho run-specific log"""
+        """
+        Thêm handler cho run-specific log.
+
+        Args:
+            logger: Logger instance
+            run_log_path: Full path to run log file
+        """
         for handler in logger.handlers:
             if isinstance(handler, logging.FileHandler):
                 if handler.baseFilename == os.path.abspath(run_log_path):
@@ -428,14 +611,13 @@ class Logger:
 
         ensure_dir(os.path.dirname(run_log_path))
 
-        run_formatter = logging.Formatter(
-            "[%(asctime)s] | %(levelname)-7s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        # Create run formatter locally using module-level constants to ensure consistency
+        run_formatter_local = logging.Formatter(LOG_RUN_FMT, datefmt=LOG_FILE_TIME_FMT)
 
-        run_file_handler = logging.FileHandler(run_log_path, encoding="utf-8")
+        # Use utf-8-sig for run logs as well
+        run_file_handler = logging.FileHandler(run_log_path, encoding="utf-8-sig")
         run_file_handler.setLevel(logging.INFO)
-        run_file_handler.setFormatter(run_formatter)
+        run_file_handler.setFormatter(run_formatter_local)
         run_file_handler.addFilter(RunLogFilter())
         logger.addHandler(run_file_handler)
 

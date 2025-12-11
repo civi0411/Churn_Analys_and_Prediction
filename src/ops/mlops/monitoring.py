@@ -4,6 +4,7 @@ Module `ops.mlops.monitoring` - ghi nhận hiệu năng mô hình và phát hi�
 Important keywords: Args, Methods, Returns
 """
 import os
+import hashlib
 import pandas as pd
 from typing import Dict
 from datetime import datetime
@@ -99,35 +100,51 @@ class ModelMonitor:
         }
 
     def create_alert(self, model_name: str, alert_type: str,
-                     message: str, severity: str = "WARNING") -> None:
-        """Tạo cảnh báo khi phát hiện sự cố."""
-        # Chỉ ghi alert vào alerts_log.csv trong base_dir (không tạo file JSON riêng)
+                     message: str, severity: str = "WARNING") -> bool:
+        """Tạo cảnh báo khi phát hiện sự cố.
+
+        Behaviors:
+        - Append an alert row into `base_dir/alerts_log.csv`.
+        - Avoid duplicate alerts: compute `alert_id` = md5(model|type|severity|message) and skip if exists.
+        - Return True if alert is written, False if skipped or on failure.
+        """
         ensure_dir(self.base_dir)
 
+        timestamp = datetime.now().isoformat()
         alert = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": timestamp,
             "model_name": model_name,
             "alert_type": alert_type,
             "severity": severity,
             "message": message
         }
 
+        # stable id (exclude timestamp) so identical alerts deduplicate
+        raw_id = f"{model_name}|{alert_type}|{severity}|{message}"
+        alert_id = hashlib.md5(raw_id.encode("utf-8")).hexdigest()
+        alert["alert_id"] = alert_id
+
         alerts_log = os.path.join(self.base_dir, "alerts_log.csv")
         new_row = pd.DataFrame([alert])
 
         try:
+            # Lightweight dedupe: if file exists and contains alert_id, skip
             if os.path.exists(alerts_log):
-                df = pd.read_csv(alerts_log)
-                if df.empty:
-                    df = new_row
-                else:
-                    df = pd.concat([df, new_row], ignore_index=True)
-            else:
-                df = new_row
-            df.to_csv(alerts_log, index=False)
+                try:
+                    df_existing = pd.read_csv(alerts_log)
+                except Exception:
+                    df_existing = pd.DataFrame()
+
+                if not df_existing.empty and 'alert_id' in df_existing.columns:
+                    if (df_existing['alert_id'] == alert_id).any():
+                        return False
+
+            # Append row atomically-ish using to_csv mode='a'
+            new_row.to_csv(alerts_log, mode='a', header=not os.path.exists(alerts_log), index=False)
+            return True
         except Exception as e:
-            # Use print for now (no logger attached) but keep message concise
             print(f"Error logging alert: {e}")
+            return False
 
     def check_health(self, model_name: str, current_metrics: Dict[str, float],
                      baseline_metrics: Dict[str, float] = None,

@@ -7,7 +7,8 @@ Important keywords: Args, Returns, Methods, Notes
 import os
 import shutil
 import logging
-from typing import Dict, Any, Tuple
+import pandas as pd
+from typing import Dict, Any, Tuple, Optional
 
 # --- NEW MODULAR IMPORTS ---
 from .data import DataPreprocessor, DataTransformer
@@ -466,9 +467,8 @@ class Pipeline:
         run_name = f"{get_timestamp()}_{mode.upper()}"
         run_id = self.tracker.start_run(run_name)
 
-        self.logger.info(f"\n{'=' * 70}")
-        self.logger.info(f"PIPELINE STARTED | Mode: {mode.upper()} | Run ID: {run_id}")
-        self.logger.info(f"{'=' * 70}\n")
+        # Use single log record for header to avoid duplicate separator-only lines
+        self._log_header(f"PIPELINE STARTED  Mode: {mode.upper()}  Run ID: {run_id}")
 
         # 2. Setup Run-specific Logging & Config Snapshot
         if self.tracker.current_run_dir:
@@ -608,42 +608,46 @@ class Pipeline:
             self.logger.info(f"Best Model: {trainer.best_model_name}")
             self.logger.info(f"Metrics: {metrics.get(trainer.best_model_name, {})}")
 
-    def run_predict(self, input_path: str = None, model_path: str = None, output_path: str = None, transformer_path: str = None) -> str:
+    def run_predict(self, input_path: str = None, model_path: str = None, output_path: str = None, transformer_path: str = None) -> Optional[str]:
         """
         Predict with optional drift detection.
         """
         self.logger.info("=" * 70)
         self.logger.info("STAGE: PREDICT")
 
+        # Default transformer state path (may be used if you want to load a saved transformer)
         if transformer_path is None:
             transformer_path = os.path.join(self.config['mlops']['registry_dir'], 'transformer_state.joblib')
+
+        # If a saved transformer state exists, load it so transform() applies the same encoders/scaler
         try:
-            self.transformer = IOHandler.load_model(transformer_path)
-            self.logger.info(f"Transformer State Loaded | {transformer_path}")
-        except FileNotFoundError:
-            self.logger.error(f"Transformer state file not found: {transformer_path}. Have you run 'python main.py --mode full' hoặc '--mode preprocess' trước để lưu state?")
-            raise
-        except Exception as e:
-            self.logger.error(f"Error loading transformer state: {e}")
-            raise
+            if transformer_path and os.path.exists(transformer_path):
+                try:
+                    loaded_transformer = IOHandler.load_model(transformer_path)
+                    # Replace the in-memory transformer with the saved fitted one
+                    self.transformer = loaded_transformer
+                    self.logger.info(f"Loaded transformer state from {transformer_path}")
+                except Exception as _e:
+                    self.logger.warning(f"Failed to load transformer state ({transformer_path}): {_e}. Using current transformer instance.")
+        except Exception:
+            # Defensive: if any path-handling weirdness occurs, continue with in-memory transformer
+            pass
 
-        # 1. Check input_path
-        if not input_path or not os.path.exists(input_path):
-            self.logger.error(f"Input data file not found: {input_path}")
-            raise FileNotFoundError(f"Input data file not found: {input_path}")
-
-        # 2. Check model_path
-        if not model_path:
-            reg_dir = self.config['mlops']['registry_dir']
-            import glob
-            models = sorted(glob.glob(os.path.join(reg_dir, '*.joblib')))
-            if not models:
-                self.logger.error(f"No model found in {reg_dir}")
-                raise FileNotFoundError(f"No model found in {reg_dir}")
-            model_path = models[-1]
-        if not os.path.exists(model_path):
-            self.logger.error(f"Model file not found: {model_path}")
-            raise FileNotFoundError(f"Model file not found: {model_path}")
+        # Resolve model_path: use provided path, otherwise try to find latest model in registry
+        if model_path is None:
+            try:
+                models_info = self.registry.list_models()
+                latest_info = None
+                for name, infos in models_info.items():
+                    for info in infos:
+                        if latest_info is None or info.get('timestamp', '') > latest_info.get('timestamp', ''):
+                            latest_info = info
+                if latest_info is None:
+                    raise FileNotFoundError("No model found in registry")
+                model_path = latest_info['path']
+            except Exception as e:
+                self.logger.error(f"Model file not found: {e}")
+                raise FileNotFoundError(f"Model file not found: {e}")
 
         # 3. Load
         df = self.preprocessor.load_data(input_path)
@@ -676,14 +680,73 @@ class Pipeline:
                 df_clean_drift,
                 threshold=drift_config.get('pvalue_threshold', 0.05)
             )
-            severity = report['summary']['drift_severity']
+            # Do not persist drift report JSON under monitoring; only emit a concise log and rely on alerts_log.csv
+            try:
+                # Log a concise summary for observability (full report kept in-memory by caller if needed)
+                summary = report.get('summary', {})
+                self.logger.info(f"Drift report summary: severity={summary.get('drift_severity')} drifted_features={summary.get('drifted_features')}")
+            except Exception:
+                self.logger.debug("Failed to log drift report summary")
+
+            severity = report['summary'].get('drift_severity')
+            if severity and severity != 'NONE':
+                msg = f"Drift severity={severity}; drifted_features={report['summary'].get('drifted_features', 0)}"
+                model_name_for_alert = getattr(self.trainer, 'best_model_name', None) or 'prediction'
+                try:
+                    created = self.monitor.create_alert(
+                        model_name=model_name_for_alert,
+                        alert_type='data_drift',
+                        message=msg,
+                        severity=severity
+                    )
+                    if created:
+                        self.logger.warning(f"Drift alert created: {severity}")
+                    else:
+                        self.logger.info("Drift alert already existed or was skipped")
+                except Exception as _e:
+                    self.logger.warning(f"Failed to create drift alert: {_e}")
+
             if severity == 'CRITICAL' and drift_config.get('abort_on_critical', True):
                 self.logger.error("CRITICAL DRIFT DETECTED - Aborting prediction")
                 return None
-            # KHÔNG LƯU drift report ra file nữa
+            # end drift handling
 
         # 6. Transform & Predict
         X, _ = self.transformer.transform(df_clean)
+
+        # If transform left any object dtype columns, try to encode them using saved encoders;
+        # fallback: convert to pandas.Categorical so xgboost accepts them (requires xgboost >= support)
+        try:
+            obj_cols = [c for c in X.columns if X[c].dtype == 'object']
+            if obj_cols:
+                # Try to use transformer encoders if available
+                try:
+                    encoders = getattr(self.transformer, '_learned_params', {}).get('encoders', {})
+                    for col in list(obj_cols):
+                        if col in encoders:
+                            le = encoders[col]
+                            # Map using encoder classes; unseen -> -1
+                            try:
+                                X[col] = X[col].apply(lambda x: le.transform([str(x)])[0] if str(x) in le.classes_ else -1)
+                                # ensure numeric dtype
+                                X[col] = pd.to_numeric(X[col], errors='coerce').fillna(-1).astype(int)
+                            except Exception:
+                                # fallback: attempt mapping via categories
+                                X[col] = pd.Categorical(X[col].astype(str)).codes
+                            # remove from obj_cols list
+                            obj_cols.remove(col)
+                except Exception:
+                    self.logger.debug("Encoders not available or failed; will fallback to categorical codes")
+
+                # For any remaining object cols, convert to categorical codes (int)
+                for col in obj_cols:
+                    try:
+                        X[col] = pd.Categorical(X[col]).codes
+                    except Exception:
+                        X[col] = X[col].astype(str).fillna('').astype('category').cat.codes
+        except Exception as _e:
+            self.logger.warning(f"Post-transform dtype adjustment failed: {_e}")
+
         model = IOHandler.load_model(model_path)
         y_pred = model.predict(X)
 
@@ -723,3 +786,12 @@ class Pipeline:
                         self.logger.warning(f"[Drift] Numeric column '{col}' contains non-numeric values: {e}. Will skip this column in drift check.")
                     df.drop(columns=[col], inplace=True)
         return df
+
+    def _log_header(self, title: str):
+        """
+        Ghi log header cho một run, bao gồm các separator và tiêu đề.
+        """
+        self.logger.info("=" * 70)
+        self.logger.info(title)
+        self.logger.info("=" * 70)
+
