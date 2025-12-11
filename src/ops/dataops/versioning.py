@@ -12,14 +12,25 @@ from ...utils import IOHandler, ensure_dir, compute_file_hash
 
 class DataVersioning:
     """
-    Quản lý phiên bản dữ liệu (hash-based).
+    Hệ thống quản lý phiên bản dữ liệu dựa trên mã băm (hash-based versioning), hỗ trợ truy vết nguồn gốc (lineage) và so sánh các phiên bản.
 
     Methods:
-        create_version(file_path, dataset_name, df, ...)
-        get_version_info, list_versions, compare_versions, add_lineage
+        create_version: Tạo phiên bản mới cho tập dữ liệu.
+        add_lineage: Ghi nhận thông tin nguồn gốc (cha-con) và phép biến đổi.
+        get_version_info: Lấy thông tin chi tiết của một phiên bản.
+        get_lineage_tree: Truy vết cây lịch sử dữ liệu.
+        list_versions: Liệt kê danh sách các phiên bản.
+        compare_versions: So sánh sự khác biệt giữa hai phiên bản.
     """
 
     def __init__(self, versions_dir: str, logger=None):
+        """
+        Khởi tạo hệ thống versioning.
+
+        Args:
+            versions_dir (str): Đường dẫn thư mục lưu trữ metadata các phiên bản.
+            logger (logging.Logger, optional): Logger để ghi nhận thông tin.
+        """
         self.versions_dir = versions_dir
         self.logger = logger
         ensure_dir(self.versions_dir)
@@ -27,23 +38,34 @@ class DataVersioning:
         self._load_history()
 
     def _load_history(self):
+        """Tải lịch sử version từ file JSON."""
         if os.path.exists(self.history_file):
             self.history = IOHandler.load_json(self.history_file)
         else:
             self.history = {}
 
     def _save_history(self):
+        """Lưu lịch sử version xuống file JSON."""
         IOHandler.save_json(self.history, self.history_file)
 
-    def create_version(
-        self,
-        file_path: str,
-        dataset_name: str = "raw_data",
-        df: pd.DataFrame = None,
-        description: str = None,
-        tags: list = None
-    ) -> str:
-        """Tạo phiên bản mới cho tập dữ liệu."""
+    def create_version(self, file_path: str, dataset_name: str = "raw_data",
+                       df: pd.DataFrame = None, description: str = None, tags: list = None) -> str:
+        """
+        Tạo và lưu trữ một phiên bản mới cho tập dữ liệu nếu có sự thay đổi về nội dung (dựa trên hash).
+
+        Args:
+            file_path (str): Đường dẫn đến file dữ liệu vật lý.
+            dataset_name (str, optional): Tên định danh logic của bộ dữ liệu (vd: 'raw_data', 'cleaned_data'). Defaults to "raw_data".
+            df (pd.DataFrame, optional): DataFrame chứa dữ liệu để trích xuất metadata và profile. Defaults to None.
+            description (str, optional): Mô tả ngắn về phiên bản này. Defaults to None.
+            tags (list, optional): Danh sách nhãn (tags) để phân loại. Defaults to None.
+
+        Returns:
+            str: ID của phiên bản vừa tạo (hoặc phiên bản hiện tại nếu không có thay đổi).
+
+        Raises:
+            FileNotFoundError: Nếu file_path không tồn tại.
+        """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Không thể version file không tồn tại: {file_path}")
 
@@ -84,6 +106,7 @@ class DataVersioning:
         return ver_id
 
     def _extract_metadata(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Trích xuất metadata cơ bản (số dòng, cột, kiểu dữ liệu)."""
         return {
             "rows": len(df),
             "columns": len(df.columns),
@@ -93,6 +116,7 @@ class DataVersioning:
         }
 
     def _extract_profile(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Trích xuất thống kê mô tả (null, unique, stats)."""
         profile = {
             "null_counts": df.isnull().sum().to_dict(),
             "null_percentage": round(df.isnull().sum().sum() / (len(df) * len(df.columns)) * 100, 2),
@@ -125,7 +149,14 @@ class DataVersioning:
         return profile
 
     def add_lineage(self, dataset_name: str, parent_name: str, transformation: str = None):
-        """Thêm thông tin nguồn gốc."""
+        """
+        Cập nhật thông tin nguồn gốc (Data Lineage) cho phiên bản mới nhất của một tập dữ liệu.
+
+        Args:
+            dataset_name (str): Tên bộ dữ liệu con (đích).
+            parent_name (str): Tên bộ dữ liệu cha (nguồn).
+            transformation (str, optional): Tên phép biến đổi đã áp dụng (vd: 'cleaning', 'feature_engineering'). Defaults to None.
+        """
         if dataset_name not in self.history or not self.history[dataset_name]:
             return
 
@@ -142,7 +173,16 @@ class DataVersioning:
         self._save_history()
 
     def get_version_info(self, dataset_name: str, version_id: str = None) -> Dict:
-        """Lấy thông tin phiên bản."""
+        """
+        Lấy thông tin chi tiết của một phiên bản cụ thể.
+
+        Args:
+            dataset_name (str): Tên bộ dữ liệu.
+            version_id (str, optional): ID phiên bản. Nếu None, lấy phiên bản mới nhất.
+
+        Returns:
+            Dict: Dictionary chứa thông tin phiên bản (hash, path, metadata, profile...).
+        """
         if dataset_name not in self.history or not self.history[dataset_name]:
             return {}
 
@@ -156,7 +196,15 @@ class DataVersioning:
         return {}
 
     def get_lineage_tree(self, dataset_name: str) -> Dict:
-        """Lấy cây nguồn gốc."""
+        """
+        Truy vết ngược dòng để xây dựng cây nguồn gốc dữ liệu.
+
+        Args:
+            dataset_name (str): Tên bộ dữ liệu cần truy vết.
+
+        Returns:
+            Dict: Cấu trúc cây mô tả luồng dữ liệu từ nguồn đến đích.
+        """
         lineage = {"dataset": dataset_name, "parents": []}
 
         info = self.get_version_info(dataset_name)
@@ -174,13 +222,31 @@ class DataVersioning:
         return lineage
 
     def list_versions(self, dataset_name: str = None) -> Dict:
-        """Liệt kê tất cả các phiên bản."""
+        """
+        Liệt kê lịch sử các phiên bản của một hoặc tất cả bộ dữ liệu.
+
+        Args:
+            dataset_name (str, optional): Tên bộ dữ liệu cụ thể. Nếu None, liệt kê tất cả.
+
+        Returns:
+            Dict: Danh sách các phiên bản.
+        """
         if dataset_name:
             return {dataset_name: self.history.get(dataset_name, [])}
         return self.history
 
     def compare_versions(self, dataset_name: str, v1_id: str, v2_id: str) -> Dict:
-        """So sánh hai phiên bản."""
+        """
+        So sánh metadata và statistics giữa hai phiên bản của cùng một bộ dữ liệu.
+
+        Args:
+            dataset_name (str): Tên bộ dữ liệu.
+            v1_id (str): ID phiên bản thứ nhất.
+            v2_id (str): ID phiên bản thứ hai.
+
+        Returns:
+            Dict: Kết quả so sánh (chênh lệch số dòng, số cột, thay đổi hash...).
+        """
         v1 = self.get_version_info(dataset_name, v1_id)
         v2 = self.get_version_info(dataset_name, v2_id)
 

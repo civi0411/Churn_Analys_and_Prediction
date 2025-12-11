@@ -8,17 +8,18 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from scipy.stats import chi2_contingency
-from typing import Dict, Any, Optional, Tuple
-from ...utils import IOHandler, ensure_dir, get_timestamp
+from typing import Dict, Any
 
 
 class DataDriftDetector:
     """
-    Phát hiện drift giữa `new_data` và `reference_data` (training baseline).
+    Phát hiện sự trôi dạt dữ liệu (Drift) giữa dữ liệu mới (New Data) và dữ liệu tham chiếu (Reference/Training Data).
 
     Methods:
-        detect_drift(new_data, threshold): tổng hợp schema/numerical/categorical drift
-        _detect_numerical_drift, _detect_categorical_drift, _detect_schema_drift
+        detect_drift: Phương thức chính để phát hiện drift tổng thể (Schema, Numerical, Categorical).
+        _detect_schema_drift: Kiểm tra thay đổi cấu trúc bảng.
+        _detect_numerical_drift: Kiểm tra drift cho biến số (KS-Test).
+        _detect_categorical_drift: Kiểm tra drift cho biến phân loại (Chi-square Test).
     """
 
     def __init__(self, reference_data: pd.DataFrame, logger=None):
@@ -35,7 +36,12 @@ class DataDriftDetector:
         self.ref_stats = self._compute_statistics(reference_data)
 
     def _compute_statistics(self, df: pd.DataFrame) -> Dict:
-        """Tính statistics cơ bản cho reference data (numerical/categorical/schema)."""
+        """
+        Tính toán các chỉ số thống kê cơ bản cho dữ liệu tham chiếu.
+
+        Returns:
+            Dict: Chứa thông tin thống kê của numerical, categorical và schema.
+        """
         stats_out = {
             'numerical': {},
             'categorical': {},
@@ -69,14 +75,16 @@ class DataDriftDetector:
 
     def detect_drift(self, new_data: pd.DataFrame, threshold: float = 0.05, sample_frac: float = 1.0, max_rows: int = None) -> Dict[str, Any]:
         """
-        Phát hiện toàn bộ drift: schema, numerical, categorical
+       Phát hiện toàn bộ các loại drift: Schema, Numerical, Categorical.
 
         Args:
-            new_data: Data mới cần kiểm tra
-            threshold: P-value threshold cho statistical tests
+            new_data (pd.DataFrame): Dữ liệu mới cần kiểm tra.
+            threshold (float, optional): Ngưỡng P-value cho các kiểm định thống kê. Defaults to 0.05.
+            sample_frac (float, optional): Tỷ lệ lấy mẫu nếu dữ liệu quá lớn. Defaults to 1.0.
+            max_rows (int, optional): Số dòng tối đa để kiểm tra. Defaults to None.
 
         Returns:
-            Dict chứa drift report
+            Dict[str, Any]: Báo cáo chi tiết về drift.
         """
         report: Dict[str, Any] = {
             'has_drift': False,
@@ -129,7 +137,15 @@ class DataDriftDetector:
         return report
 
     def _detect_schema_drift(self, new_data: pd.DataFrame) -> Dict:
-        """Phát hiện thay đổi schema"""
+        """
+        Kiểm tra tính toàn vẹn của cấu trúc bảng (Schema Integrity).
+
+        Args:
+            new_data (pd.DataFrame): Dữ liệu mới.
+
+        Returns:
+            Dict: Kết quả kiểm tra, bao gồm danh sách cột thiếu, cột mới và thay đổi kiểu dữ liệu.
+        """
         ref_cols = self.ref_stats['schema']['columns']
         new_cols = set(new_data.columns)
 
@@ -141,7 +157,12 @@ class DataDriftDetector:
         }
 
     def _detect_dtype_changes(self, new_data: pd.DataFrame) -> Dict:
-        """Phát hiện thay đổi data types"""
+        """
+        So sánh kiểu dữ liệu (Data Types) của từng cột.
+
+        Returns:
+            Dict: Các cột có kiểu dữ liệu thay đổi so với Reference.
+        """
         changes = {}
         ref_dtypes = self.ref_stats['schema']['dtypes']
 
@@ -156,9 +177,18 @@ class DataDriftDetector:
 
     def _detect_numerical_drift(self, new_data: pd.DataFrame, threshold: float) -> Dict:
         """
-        Kolmogorov-Smirnov test cho numerical features
+        Phát hiện Drift trên các biến số bằng kiểm định Kolmogorov-Smirnov (KS Test).
 
-        KS test: So sánh 2 distributions, p-value < threshold => drift
+        Args:
+            new_data (pd.DataFrame): Dữ liệu mới.
+            threshold (float): Ngưỡng P-value (thông thường 0.05).
+
+        Returns:
+            Dict: Kết quả thống kê KS và danh sách các cột bị Drift.
+
+        Notes:
+            KS test so sánh phân phối xác suất tích lũy (CDF) của 2 mẫu.
+            Nếu p-value < threshold -> Bác bỏ giả thuyết H0 (2 phân phối giống nhau) -> Có Drift.
         """
         results: Dict[str, Any] = {}
         drifted = []
@@ -204,8 +234,19 @@ class DataDriftDetector:
 
     def _detect_categorical_drift(self, new_data: pd.DataFrame, threshold: float) -> Dict:
         """
-        Chi-square test cho categorical features, bỏ qua cột có quá nhiều unique hoặc chuỗi dài bất thường.
-        Không warning/exception ngoài logger, không ép kiểu, không chi-squared với dữ liệu không phù hợp.
+        Phát hiện Drift trên các biến phân loại bằng kiểm định Chi-square.
+
+        Args:
+            new_data (pd.DataFrame): Dữ liệu mới.
+            threshold (float): Ngưỡng P-value.
+
+        Returns:
+            Dict: Kết quả thống kê Chi-square và danh sách các cột bị Drift.
+
+        Notes:
+            - Tự động bỏ qua các cột có High Cardinality (quá nhiều giá trị duy nhất, > 50).
+            - Tự động bỏ qua các cột chứa chuỗi ký tự quá dài (> 200 chars).
+            - Drift được xác nhận nếu p-value < threshold HOẶC xuất hiện danh mục (category) mới.
         """
         results: Dict[str, Any] = {}
         drifted = []
@@ -285,10 +326,15 @@ class DataDriftDetector:
 
     def _calculate_drift_severity(self, report: Dict) -> str:
         """
-        Tính mức độ nghiêm trọng của drift
+        Đánh giá mức độ nghiêm trọng của Drift.
 
         Returns:
-            'NONE', 'LOW', 'MODERATE', 'CRITICAL'
+            str: Mức độ nghiêm trọng ('NONE', 'LOW', 'MODERATE', 'CRITICAL').
+
+        Logic:
+            - CRITICAL: Nếu Schema thay đổi (mất cột, sai kiểu) hoặc > 30% features bị drift.
+            - MODERATE: Nếu > 15% features bị drift.
+            - LOW: Có ít nhất 1 feature bị drift.
         """
         total = report['summary'].get('total_features_checked', 0)
         drifted = report['summary'].get('drifted_features', 0)
@@ -312,11 +358,3 @@ class DataDriftDetector:
             return 'LOW'
         else:
             return 'NONE'
-
-def detect_drift_full(df_train, df_predict, logger=None, threshold=0.05, report_path=None):
-    """
-    Hàm drift detection tổng hợp cho cả numeric và categorical, tổng hợp severity, lưu report nếu cần.
-    """
-    detector = DataDriftDetector(df_train, logger)
-    report = detector.detect_drift(df_predict, threshold=threshold)
-    return report

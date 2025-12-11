@@ -13,13 +13,23 @@ from ...utils import ensure_dir
 
 class ModelMonitor:
     """
-    Monitor model performance in production.
+    Hệ thống giám sát hiệu năng mô hình trong môi trường sản xuất (Production), theo dõi lịch sử và cảnh báo sự cố.
 
     Methods:
-        log_performance, get_performance_history, detect_drift, create_alert, check_health
+        log_performance: Ghi nhận các chỉ số hiệu năng mới.
+        get_performance_history: Truy xuất lịch sử hiệu năng.
+        detect_drift: Phát hiện sự suy giảm hiệu năng so với ban đầu.
+        create_alert: Tạo cảnh báo hệ thống.
+        check_health: Đánh giá tổng quát sức khỏe mô hình.
     """
 
     def __init__(self, base_dir: str = "artifacts/monitoring"):
+        """
+        Khởi tạo bộ giám sát, thiết lập thư mục lưu trữ log và khởi tạo file log nếu chưa tồn tại.
+
+        Args:
+            base_dir (str, optional): Đường dẫn thư mục lưu trữ log theo dõi. Defaults to "artifacts/monitoring".
+        """
         self.base_dir = base_dir
         ensure_dir(base_dir)
         self.performance_log = os.path.join(base_dir, "performance_log.csv")
@@ -34,7 +44,16 @@ class ModelMonitor:
     def log_performance(self, model_name: str, metrics: Dict[str, float],
                         model_version: str = None, n_samples: int = None,
                         notes: str = None):
-        """Ghi nhận hiệu năng mô hình."""
+        """
+        Ghi nhận (Log) các chỉ số hiệu năng của mô hình tại thời điểm hiện tại vào file CSV.
+
+        Args:
+            model_name (str): Tên mô hình.
+            metrics (Dict[str, float]): Dictionary chứa các metrics (accuracy, f1, precision...).
+            model_version (str, optional): Phiên bản mô hình. Defaults to None.
+            n_samples (int, optional): Số lượng mẫu dùng để đánh giá. Defaults to None.
+            notes (str, optional): Ghi chú thêm. Defaults to None.
+        """
         new_row = pd.DataFrame([{
             "timestamp": datetime.now().isoformat(),
             "model_name": model_name,
@@ -62,7 +81,15 @@ class ModelMonitor:
             print(f"Error logging performance: {e}")
 
     def get_performance_history(self, model_name: str = None) -> pd.DataFrame:
-        """Lấy lịch sử hiệu năng."""
+        """
+        Lấy toàn bộ lịch sử hiệu năng đã được ghi nhận.
+
+        Args:
+            model_name (str, optional): Tên mô hình cần lọc. Nếu None, lấy tất cả.
+
+        Returns:
+            pd.DataFrame: DataFrame chứa lịch sử hiệu năng.
+        """
         if not os.path.exists(self.performance_log):
             return pd.DataFrame()
 
@@ -75,7 +102,17 @@ class ModelMonitor:
 
     def detect_drift(self, model_name: str, metric: str = "f1",
                      threshold: float = 0.05) -> Dict:
-        """Phát hiện drift hiệu năng."""
+        """
+        So sánh hiệu năng hiện tại với hiệu năng ban đầu (baseline) để phát hiện sự trôi dạt (Drift).
+
+        Args:
+            model_name (str): Tên mô hình.
+            metric (str, optional): Metric dùng để so sánh (vd: 'f1'). Defaults to "f1".
+            threshold (float, optional): Ngưỡng chênh lệch cho phép. Defaults to 0.05.
+
+        Returns:
+            Dict: Kết quả phát hiện drift (drift_detected, baseline, current, drift_value...).
+        """
         history = self.get_performance_history(model_name)
 
         if len(history) < 2:
@@ -101,12 +138,21 @@ class ModelMonitor:
 
     def create_alert(self, model_name: str, alert_type: str,
                      message: str, severity: str = "WARNING") -> bool:
-        """Tạo cảnh báo khi phát hiện sự cố.
+        """
+        Tạo và ghi lại một cảnh báo vào hệ thống khi phát hiện sự cố.
 
-        Behaviors:
-        - Append an alert row into `base_dir/alerts_log.csv`.
-        - Avoid duplicate alerts: compute `alert_id` = md5(model|type|severity|message) and skip if exists.
-        - Return True if alert is written, False if skipped or on failure.
+        Notes:
+            Hỗ trợ cơ chế khử trùng lặp (deduplication) dựa trên mã hash của nội dung cảnh báo
+            để tránh spam log với các cảnh báo giống hệt nhau.
+
+        Args:
+            model_name (str): Tên mô hình gặp sự cố.
+            alert_type (str): Loại cảnh báo (vd: 'drift', 'performance_drop').
+            message (str): Nội dung chi tiết cảnh báo.
+            severity (str, optional): Mức độ nghiêm trọng ('INFO', 'WARNING', 'CRITICAL'). Defaults to "WARNING".
+
+        Returns:
+            bool: True nếu cảnh báo được ghi mới, False nếu bị bỏ qua (do trùng lặp hoặc lỗi).
         """
         ensure_dir(self.base_dir)
 
@@ -149,7 +195,18 @@ class ModelMonitor:
     def check_health(self, model_name: str, current_metrics: Dict[str, float],
                      baseline_metrics: Dict[str, float] = None,
                      thresholds: Dict[str, float] = None) -> Dict:
-        """Kiểm tra sức khỏe mô hình."""
+        """
+        Kiểm tra sức khỏe tổng thể của mô hình dựa trên các ngưỡng cứng (thresholds) và so sánh với baseline.
+
+        Args:
+            model_name (str): Tên mô hình.
+            current_metrics (Dict[str, float]): Metrics hiện tại.
+            baseline_metrics (Dict[str, float], optional): Metrics ban đầu để so sánh drift.
+            thresholds (Dict[str, float], optional): Các ngưỡng tối thiểu (vd: f1_min, accuracy_min).
+
+        Returns:
+            Dict: Báo cáo sức khỏe (status, issues, recommendations).
+        """
         if thresholds is None:
             thresholds = {
                 "f1_min": 0.70,

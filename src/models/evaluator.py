@@ -14,20 +14,42 @@ from sklearn.metrics import (
 
 class ModelEvaluator:
     """
-    Đánh giá mô hình classification.
+    Class: ModelEvaluator
+    Chịu trách nhiệm tính toán các chỉ số đánh giá (metrics) cho mô hình phân loại.
 
     Methods:
-        evaluate(model, X_test, y_test, model_name)
+        evaluate(model, X_test, y_test, model_name): Thực hiện đánh giá toàn diện và trả về kết quả.
     """
 
     def __init__(self, logger=None):
-        """Khởi tạo ModelEvaluator với logger tùy chọn."""
+        """
+        Constructor: __init__
+        Khởi tạo ModelEvaluator.
+
+        Args:
+            logger (logging.Logger, optional): Đối tượng logger để ghi lại kết quả đánh giá. Defaults to None.
+        """
         self.logger = logger
 
     def evaluate(self, model: Any, X_test, y_test, model_name: str = 'model') -> Dict[str, Any]:
-        """Tính các metrics cơ bản và trả về dict kết quả.
+        """
+        Method: evaluate
+        Tính toán các metrics cơ bản và trả về dictionary chứa kết quả chi tiết.
 
-        Returns dict có keys: metrics, y_pred, y_pred_proba, classification_report, confusion_matrix, roc_curve_data
+        Args:
+            model (Any): Mô hình đã được huấn luyện (cần có method .predict, và tùy chọn .predict_proba).
+            X_test (pd.DataFrame or np.ndarray): Dữ liệu đặc trưng (features) tập kiểm thử.
+            y_test (pd.Series or np.ndarray): Nhãn thực tế (true labels) tập kiểm thử.
+            model_name (str, optional): Tên mô hình để hiển thị trong log. Defaults to 'model'.
+
+        Returns:
+            Dict[str, Any]: Dictionary chứa kết quả đánh giá, bao gồm các keys:
+                - 'metrics': Dict các chỉ số (accuracy, precision, recall, f1, roc_auc).
+                - 'y_pred': Mảng dự đoán nhãn.
+                - 'y_pred_proba': Mảng dự đoán xác suất (nếu có).
+                - 'classification_report': Báo cáo chi tiết dạng text.
+                - 'confusion_matrix': Ma trận nhầm lẫn.
+                - 'roc_curve_data': Tuple (fpr, tpr, auc) để vẽ biểu đồ ROC.
         """
         # Predictions
         y_pred = model.predict(X_test)

@@ -5,9 +5,7 @@ Important keywords: Args, Returns, Methods, Notes
 """
 import pandas as pd
 import re
-from typing import Dict, Any, Optional
-import os
-from ...utils import IOHandler, ensure_dir
+from typing import Dict, Any
 
 
 class DataValidator:
@@ -20,13 +18,32 @@ class DataValidator:
     """
 
     def __init__(self, logger=None):
+        """_
+        Khởi tạo DataValidator.
+
+        Args:
+            logger (logging.Logger, optional): Đối tượng logger để ghi lại các cảnh báo vi phạm. Defaults to None.
+        """
         self.logger = logger
 
     def validate_quality(self, df: pd.DataFrame) -> Dict[str, Any]:
-        """Check basic data quality: null ratio, duplicate ratio."""
+        """
+        Kiểm tra các chỉ số chất lượng dữ liệu cơ bản như tỷ lệ giá trị thiếu và tỷ lệ trùng lặp.
+
+        Args:
+            df (pd.DataFrame): DataFrame cần kiểm tra.
+
+        Returns:
+            Dict[str, Any]: Dictionary chứa kết quả:
+                - 'null_ratio': Tỷ lệ giá trị thiếu trên toàn bộ bảng.
+                - 'duplicate_ratio': Tỷ lệ hàng bị trùng lặp.
+                - 'rows': Tổng số dòng dữ liệu.
+                - 'quality_score': Điểm chất lượng tổng hợp (thang 0.0 - 1.0).
+        """
         n_rows = len(df)
         if n_rows == 0:
-            return {"null_ratio": 0, "duplicate_ratio": 0, "rows": 0}
+            # For empty DataFrame return sensible defaults including a quality_score key
+            return {"null_ratio": 0, "duplicate_ratio": 0, "rows": 0, "quality_score": 1.0}
 
         null_ratio = df.isnull().sum().sum() / (n_rows * len(df.columns))
         dup_ratio = df.duplicated().sum() / n_rows
@@ -37,19 +54,35 @@ class DataValidator:
             if dup_ratio > 0.05:
                 self.logger.warning(f"  [WARN] High Duplicate Ratio: {dup_ratio:.2%}")
 
+        # Simple composite quality score in range [0, 1]. Higher is better.
+        # We average the complement of null and duplicate ratios. This is simple and stable.
+        try:
+            quality_score = float(max(0.0, 1.0 - ((null_ratio + dup_ratio) / 2.0)))
+        except Exception:
+            quality_score = 0.0
+
         return {
             "null_ratio": null_ratio,
             "duplicate_ratio": dup_ratio,
-            "rows": n_rows
+            "rows": n_rows,
+            "quality_score": quality_score,
         }
 
     def validate_business_rules(self, df: pd.DataFrame, n_examples: int = 5) -> Dict[str, Any]:
         """
-        Validate domain/business rules and return a structured report.
+        Kiểm tra dữ liệu dựa trên các quy tắc nghiệp vụ (Domain/Business Rules) đã định nghĩa.
 
-        Returns a dict with keys:
-            - passed (bool)
-            - range_violations, logic_violations, format_violations, referential_violations
+        Args:
+            df (pd.DataFrame): DataFrame cần kiểm tra.
+            n_examples (int, optional): Số lượng ví dụ vi phạm tối đa cần lưu lại cho mỗi loại lỗi. Defaults to 5.
+
+        Returns:
+            Dict[str, Any]: Báo cáo cấu trúc về các vi phạm, bao gồm:
+                - 'passed': (bool) True nếu dữ liệu vượt qua tất cả các quy tắc.
+                - 'range_violations': Vi phạm về phạm vi giá trị (vd: số âm không hợp lệ).
+                - 'logic_violations': Vi phạm về logic chéo giữa các cột (vd: có Cashback nhưng không có Order).
+                - 'format_violations': Vi phạm về định dạng chuỗi (Email, Phone).
+                - 'referential_violations': Vi phạm về ràng buộc tham chiếu (Null ID, Duplicate ID).
         """
         report = {
             'passed': True,
@@ -162,4 +195,3 @@ class DataValidator:
                     self.logger.info(f"BusinessRule[REF_CUSTOMER]: {cnt_dup} rows with duplicated CustomerID (flagged)")
 
         return report
-

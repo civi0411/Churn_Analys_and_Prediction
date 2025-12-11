@@ -14,13 +14,25 @@ from ...utils import IOHandler, ensure_dir
 
 class ExperimentTracker:
     """
-    Simple experiment tracker thay thế cho MLflow (file-based).
+    Hệ thống theo dõi thí nghiệm (Experiment Tracking) thay thế đơn giản cho MLflow, sử dụng file CSV và JSON để lưu trữ log.
 
     Methods:
-        start_run(run_name), end_run(status), log_params, log_metrics, log_artifact, get_run_info
+        start_run: Bắt đầu một phiên chạy (run) mới.
+        end_run: Kết thúc phiên chạy hiện tại.
+        log_params: Ghi lại các tham số (parameters) của thí nghiệm.
+        log_metrics: Ghi lại các chỉ số (metrics) của thí nghiệm.
+        log_artifact: Lưu trữ các file kết quả (model, plot, data).
+        get_run_info: Lấy thông tin chi tiết về một phiên chạy.
+        log_metadata: Ghi lại thông tin môi trường và hệ thống.
     """
 
     def __init__(self, base_dir: str = "artifacts/experiments"):
+        """
+        Khởi tạo ExperimentTracker, thiết lập thư mục gốc và file log tổng hợp.
+
+        Args:
+            base_dir (str, optional): Đường dẫn thư mục gốc để lưu trữ các thí nghiệm. Defaults to "artifacts/experiments".
+        """
         self.base_dir = base_dir
         self.experiments_file = os.path.join(base_dir, "experiments.csv")
         ensure_dir(base_dir)
@@ -36,7 +48,15 @@ class ExperimentTracker:
         self.run_start_time = None
 
     def start_run(self, run_name: str = None) -> str:
-        """Start a new run."""
+        """
+        Bắt đầu một phiên chạy (run) mới, tạo thư mục riêng cho run và ghi nhận vào lịch sử.
+
+        Args:
+            run_name (str, optional): Tên định danh cho run. Nếu None, tự động tạo theo timestamp. Defaults to None.
+
+        Returns:
+            str: ID của run vừa khởi tạo.
+        """
         self.run_start_time = datetime.now()
         if run_name is None:
             run_name = self.run_start_time.strftime("%Y%m%d_%H%M%S")
@@ -68,7 +88,12 @@ class ExperimentTracker:
         return self.current_run_id
 
     def end_run(self, status: str = "FINISHED"):
-        """End current run."""
+        """
+        Kết thúc phiên chạy hiện tại, tính toán thời gian chạy và cập nhật trạng thái.
+
+        Args:
+            status (str, optional): Trạng thái kết thúc (vd: 'FINISHED', 'FAILED'). Defaults to "FINISHED".
+        """
         if self.current_run_id is None:
             return
 
@@ -94,7 +119,12 @@ class ExperimentTracker:
         self.run_start_time = None
 
     def log_params(self, params: Dict[str, Any]):
-        """Save parameters."""
+        """
+        Lưu các tham số cấu hình (hyperparameters, config) vào file JSON trong thư mục run.
+
+        Args:
+            params (Dict[str, Any]): Dictionary chứa các tham số cần log.
+        """
         if self.current_run_dir is None:
             return
 
@@ -102,7 +132,12 @@ class ExperimentTracker:
         IOHandler.save_json(params, params_file)
 
     def log_metrics(self, metrics: Dict[str, float]):
-        """Save metrics."""
+        """
+        Lưu các chỉ số đánh giá (metrics) vào file JSON. Nếu file đã tồn tại, sẽ cập nhật thêm.
+
+        Args:
+            metrics (Dict[str, float]): Dictionary chứa các metrics (vd: accuracy, loss).
+        """
         if self.current_run_dir is None:
             return
 
@@ -115,29 +150,16 @@ class ExperimentTracker:
 
         IOHandler.save_json(metrics, metrics_file)
 
-    def log_artifact(self, local_path: str, artifact_path: str = None):
-        """Copy artifact to run directory."""
-        if self.current_run_dir is None or not os.path.exists(local_path):
-            return
-
-        import shutil
-        artifacts_dir = os.path.join(self.current_run_dir, "artifacts")
-        ensure_dir(artifacts_dir)
-
-        try:
-            if os.path.isfile(local_path):
-                dest = os.path.join(artifacts_dir, os.path.basename(local_path))
-                shutil.copy2(local_path, dest)
-            elif os.path.isdir(local_path):
-                dest = os.path.join(artifacts_dir, os.path.basename(local_path))
-                if os.path.exists(dest):
-                    shutil.rmtree(dest)
-                shutil.copytree(local_path, dest)
-        except Exception as e:
-            print(f"Error logging artifact {local_path}: {e}")
-
     def get_run_info(self, run_id: str = None) -> Dict:
-        """Get run info."""
+        """
+        Truy xuất toàn bộ thông tin đã log của một run (params, metrics).
+
+        Args:
+            run_id (str, optional): ID của run cần lấy thông tin. Nếu None, lấy run hiện tại. Defaults to None.
+
+        Returns:
+            Dict: Dictionary chứa thông tin chi tiết của run.
+        """
         if run_id is None:
             run_id = self.current_run_id
 
@@ -162,7 +184,12 @@ class ExperimentTracker:
         return info
 
     def log_metadata(self, metadata: Dict[str, Any]):
-        """Log environment info."""
+        """
+        Ghi lại thông tin môi trường hệ thống (Python version, OS, Timestamp) và các metadata tùy chỉnh khác.
+
+        Args:
+            metadata (Dict[str, Any]): Thông tin bổ sung cần log.
+        """
         if self.current_run_dir is None:
             return
 

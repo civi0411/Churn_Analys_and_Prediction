@@ -123,11 +123,18 @@ class Pipeline:
         return summary
 
     # Helper method để generate report
-    def _generate_report_for_run(self, mode: str, optimize: bool = False,
-                                 trainer: ModelTrainer = None,
-                                 metrics: Dict = None,
-                                 eda_summary: Dict = None):
-        """Generate report cho run hiện tại."""
+    def _generate_report_for_run(self, mode: str, optimize: bool = False, trainer: ModelTrainer = None,
+                                 metrics: Dict = None, eda_summary: Dict = None):
+        """
+        Tạo báo cáo tổng hợp (Markdown) cho lần chạy hiện tại, bao gồm thông tin EDA, Training và Metrics.
+
+        Args:
+            mode (str): Chế độ chạy hiện tại.
+            optimize (bool, optional): Có tối ưu hóa tham số không.
+            trainer (ModelTrainer, optional): Đối tượng huấn luyện chứa thông tin model tốt nhất.
+            metrics (Dict, optional): Kết quả đánh giá các model.
+            eda_summary (Dict, optional): Thông tin tóm tắt từ bước EDA.
+        """
         try:
             feature_importance = None
             best_model_name = None
@@ -155,7 +162,8 @@ class Pipeline:
 
     # Helper method để lưu trạng thái DataTransformer
     def _save_transformer_state(self) -> str:
-        """Lưu trạng thái đã fit của `DataTransformer` vào registry.
+        """
+        Lưu trạng thái đã fit của `DataTransformer` vào registry.
 
         Returns:
             str: Đường dẫn file đã lưu.
@@ -175,7 +183,13 @@ class Pipeline:
     def run_preprocessing(self) -> Tuple[str, str, str]:
         """
         Chạy toàn bộ preprocessing pipeline:
-        RAW -> CLEAN -> SPLIT -> FIT(Train) -> TRANSFORM(Test)
+        1. Tải và làm sạch dữ liệu thô.
+        2. Kiểm tra quy tắc nghiệp vụ (Business Rules).
+        3. Chia tập Train/Test.
+        4. Biến đổi dữ liệu (Fit trên Train, Transform trên Test).
+        5. Lưu trữ dữ liệu đã xử lý dưới dạng Parquet.
+        Returns:
+            Tuple[str, str, str]: Đường dẫn tới file dữ liệu đã xử lý (Full, Train, Test).
         """
         self.logger.info("\n" + "=" * 70)
         self.logger.info("STAGE: FULL PREPROCESSING PIPELINE")
@@ -313,7 +327,16 @@ class Pipeline:
     def run_training(self, train_path: str = None, test_path: str = None,
                      model_name: str = 'all', optimize: bool = True) -> Tuple[ModelTrainer, Dict]:
         """
-        Training với dữ liệu đã được preprocess
+        Thực hiện quy trình huấn luyện, tối ưu hóa và đánh giá mô hình.
+
+        Args:
+            train_path (str, optional): Đường dẫn dữ liệu train.
+            test_path (str, optional): Đường dẫn dữ liệu test.
+            model_name (str, optional): Tên mô hình cần train ('all' hoặc tên cụ thể). Defaults to 'all'.
+            optimize (bool, optional): Có thực hiện tìm kiếm tham số (Hyperparameter Tuning) không. Defaults to True.
+
+        Returns:
+            Tuple[ModelTrainer, Dict]: Đối tượng Trainer và Dictionary chứa metrics của các mô hình.
         """
         self.logger.info("\n" + "=" * 70)
         self.logger.info("STAGE: MODEL TRAINING")
@@ -392,7 +415,11 @@ class Pipeline:
     # =========================================================================
     def run_visualization(self, trainer: ModelTrainer, metrics: Dict) -> None:
         """
-        Visualization + Model Explainability
+        Tạo các biểu đồ đánh giá chuyên sâu (ROC, Confusion Matrix, Feature Importance) và giải thích mô hình (SHAP).
+
+        Args:
+            trainer (ModelTrainer): Đối tượng trainer chứa mô hình đã huấn luyện.
+            metrics (Dict): Kết quả đánh giá mô hình.
         """
         self.logger.info("\n" + "=" * 70)
         self.logger.info("STAGE: VISUALIZATION & EXPLAINABILITY")
@@ -461,7 +488,16 @@ class Pipeline:
     def run(self, mode: str = 'full', model_name: str = 'all',
             optimize: bool = True, **kwargs) -> Any:
         """
-        Main pipeline execution
+        Điểm điều phối chính (Main Entry Point) để thực thi pipeline theo chế độ được yêu cầu.
+
+        Args:
+            mode (str, optional): Chế độ chạy ('full', 'eda', 'preprocess', 'train', 'visualize', 'predict'). Defaults to 'full'.
+            model_name (str, optional): Tên mô hình cụ thể. Defaults to 'all'.
+            optimize (bool, optional): Có tối ưu tham số không. Defaults to True.
+            **kwargs: Các tham số phụ (vd: input_path cho predict).
+
+        Returns:
+            Any: Kết quả trả về tùy thuộc vào mode (thường là trainer, metrics hoặc đường dẫn file dự đoán).
         """
         # 1. Start Tracking
         run_name = f"{get_timestamp()}_{mode.upper()}"
@@ -567,7 +603,6 @@ class Pipeline:
 
                 # 7. Final Summary
                 self._log_training_summary(trainer, metrics)
-
                 self.tracker.end_run("FINISHED")
                 return trainer, metrics
 
@@ -610,7 +645,16 @@ class Pipeline:
 
     def run_predict(self, input_path: str = None, model_path: str = None, output_path: str = None, transformer_path: str = None) -> Optional[str]:
         """
-        Predict with optional drift detection.
+        Thực hiện dự đoán trên dữ liệu mới, bao gồm kiểm tra Data Drift và áp dụng các bước biến đổi dữ liệu tương tự lúc huấn luyện.
+
+        Args:
+            input_path (str, optional): Đường dẫn file dữ liệu cần dự đoán.
+            model_path (str, optional): Đường dẫn file mô hình đã lưu. Nếu None, lấy model mới nhất từ registry.
+            output_path (str, optional): Đường dẫn lưu kết quả dự đoán.
+            transformer_path (str, optional): Đường dẫn file transformer state.
+
+        Returns:
+            Optional[str]: Đường dẫn tới file kết quả dự đoán (hoặc None nếu bị hủy do lỗi Drift nghiêm trọng).
         """
         self.logger.info("=" * 70)
         self.logger.info("STAGE: PREDICT")
@@ -763,9 +807,13 @@ class Pipeline:
 
     def _prepare_drift_data(self, df):
         """
-        Đảm bảo phân loại cột numeric/categorical đúng chuẩn trước khi drift check.
-        Nếu cột object nhưng toàn số, ép kiểu về numeric.
-        Nếu cột numeric nhưng có giá trị không chuyển được, log warning và bỏ qua cột đó khi drift check.
+        Chuẩn hóa kiểu dữ liệu (ép kiểu số, xử lý object) để đảm bảo tính toán Drift chính xác.
+
+        Args:
+            df (pd.DataFrame): DataFrame cần chuẩn hóa.
+
+        Returns:
+            pd.DataFrame: DataFrame đã được xử lý kiểu dữ liệu.
         """
         import numpy as np
         import pandas as pd

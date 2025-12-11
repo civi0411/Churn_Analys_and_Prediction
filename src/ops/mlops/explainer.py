@@ -9,13 +9,23 @@ from typing import List, Optional
 
 class ModelExplainer:
     """
-    Giúp tạo giải thích mô hình (feature importance, SHAP).
+    Hỗ trợ giải thích và minh bạch hóa mô hình học máy thông qua Feature Importance và SHAP values.
 
     Methods:
-        get_feature_importance(top_n), explain_with_shap(X_sample, save_path)
+        get_feature_importance: Trích xuất độ quan trọng của các đặc trưng.
+        explain_with_shap: Tạo và lưu biểu đồ SHAP summary plot.
     """
 
     def __init__(self, model, X_train, feature_names: List[str], logger=None):
+        """
+        Khởi tạo đối tượng giải thích mô hình.
+
+        Args:
+            model: Mô hình đã huấn luyện (Scikit-learn wrapper hoặc Pipeline).
+            X_train (pd.DataFrame or np.ndarray): Dữ liệu huấn luyện nền (background data) dùng cho SHAP.
+            feature_names (List[str]): Danh sách tên các đặc trưng.
+            logger (logging.Logger, optional): Logger để ghi lại tiến trình. Defaults to None.
+        """
         self.logger = logger
 
         # Unwrap model from pipeline if needed
@@ -43,7 +53,15 @@ class ModelExplainer:
             self._train_medians = {}
 
     def get_feature_importance(self, top_n: int = 20) -> Optional[pd.DataFrame]:
-        """Lấy độ quan trọng của các đặc trưng từ mô hình."""
+        """
+        Lấy danh sách các đặc trưng quan trọng nhất dựa trên thuộc tính `feature_importances_` của mô hình.
+
+        Args:
+            top_n (int, optional): Số lượng đặc trưng hàng đầu cần lấy. Defaults to 20.
+
+        Returns:
+            Optional[pd.DataFrame]: DataFrame chứa 2 cột ['feature', 'importance'] được sắp xếp giảm dần, hoặc None nếu mô hình không hỗ trợ.
+        """
         if not hasattr(self.model, "feature_importances_"):
             if self.logger:
                 self.logger.warning("Mô hình không có thuộc tính feature_importances_")
@@ -57,7 +75,20 @@ class ModelExplainer:
         return importance_df
 
     def explain_with_shap(self, X_sample, save_path: str = None) -> bool:
-        """Tạo giải thích SHAP."""
+        """
+        Tính toán giá trị SHAP và vẽ biểu đồ Summary Plot để giải thích tác động của các đặc trưng lên dự đoán.
+
+        Args:
+            X_sample (pd.DataFrame): Mẫu dữ liệu cần giải thích (thường lấy từ tập Test).
+            save_path (str, optional): Đường dẫn để lưu biểu đồ SHAP. Nếu None, sẽ hiển thị trực tiếp.
+
+        Returns:
+            bool: True nếu tạo và lưu thành công, False nếu có lỗi.
+
+        Notes:
+            Hỗ trợ tự động xử lý và ép kiểu dữ liệu số cho các trường hợp dữ liệu bị lẫn chuỗi ký tự lạ trước khi đưa vào SHAP Explainer.
+            Sử dụng TreeExplainer (nhanh) ưu tiên, và fallback sang KernelExplainer (chậm hơn) nếu thất bại.
+        """
         try:
             import shap
             import matplotlib.pyplot as plt

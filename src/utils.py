@@ -45,14 +45,15 @@ def set_random_seed(seed: int = 42) -> None:
     """Đặt seed cho random và numpy để tái tạo kết quả.
 
     Args:
-        seed (int): Giá trị seed.
+        seed (int, optional): Giá trị seed. Defaults to 42.
     """
     random.seed(seed)
     np.random.seed(seed)
 
 
 def get_timestamp() -> str:
-    """Trả về timestamp theo format YYYYMMDD_HHMMSS.
+    """
+    Trả về timestamp theo format YYYYMMDD_HHMMSS.
 
     Returns:
         str: timestamp hiện tại.
@@ -61,7 +62,8 @@ def get_timestamp() -> str:
 
 
 def extract_base_filename(file_path: str) -> str:
-    """Lấy tên file không phần mở rộng (basename).
+    """
+    Lấy tên file không phần mở rộng (basename).
 
     Args:
         file_path (str): Đường dẫn file.
@@ -74,11 +76,14 @@ def extract_base_filename(file_path: str) -> str:
 
 def build_processed_filename(raw_path: str, processed_dir: str) -> str:
     """
-    Build processed filename: [raw_filename]_processed.csv
+    Tạo đường dẫn file output cho bước xử lý dữ liệu dựa trên tên file gốc.
 
-    Example:
-        raw_path: 'data/raw/E Commerce Dataset.xlsx'
-        -> 'data/processed/E Commerce Dataset_processed.csv'
+    Args:
+        raw_path (str): Đường dẫn file dữ liệu thô.
+        processed_dir (str): Thư mục chứa dữ liệu đã xử lý.
+
+    Returns:
+        str: Đường dẫn file output (VD: 'processed_dir/file_processed.csv').
     """
     base_name = extract_base_filename(raw_path)
     return os.path.join(processed_dir, f"{base_name}_processed.csv")
@@ -86,15 +91,14 @@ def build_processed_filename(raw_path: str, processed_dir: str) -> str:
 
 def build_split_filenames(raw_path: str, train_test_dir: str) -> Tuple[str, str]:
     """
-    Build train/test filenames with timestamp.
+    Tạo cặp đường dẫn file Train và Test dựa trên tên file gốc.
+
+    Args:
+        raw_path (str): Đường dẫn file gốc.
+        train_test_dir (str): Thư mục chứa file Train/Test.
 
     Returns:
-        (train_path, test_path)
-
-    Example:
-        raw_path: 'data/raw/E Commerce Dataset.xlsx'
-        -> ('data/train_test/E Commerce Dataset_train_20240520_143022.parquet',
-            'data/train_test/E Commerce Dataset_test_20240520_143022.parquet')
+        Tuple[str, str]: Cặp đường dẫn (train_path, test_path).
     """
     base_name = extract_base_filename(raw_path)
     train_path = os.path.join(train_test_dir, f"{base_name}_train.parquet")
@@ -105,15 +109,17 @@ def build_split_filenames(raw_path: str, train_test_dir: str) -> Tuple[str, str]
 
 def get_latest_train_test(train_test_dir: str, raw_filename: str = None) -> Tuple[str, str]:
     """
-    Get the latest train/test files from train_test directory.
+   Tự động tìm cặp file Train/Test mới nhất trong thư mục dựa trên timestamp trong tên file.
 
     Args:
-        train_test_dir: Directory containing train/test files
-        raw_filename: Optional base filename to filter (e.g., 'E Commerce Dataset')
-                     If None, returns the latest pair regardless of source
+        train_test_dir (str): Thư mục chứa các file Train/Test.
+        raw_filename (str, optional): Tên file gốc để lọc (nếu có nhiều nguồn dữ liệu). Defaults to None.
 
     Returns:
-        (train_path, test_path) or raises FileNotFoundError
+        Tuple[str, str]: Đường dẫn tới file Train và Test mới nhất.
+
+    Raises:
+        FileNotFoundError: Nếu không tìm thấy file nào phù hợp.
     """
     if not os.path.exists(train_test_dir):
         raise FileNotFoundError(f"Train/test directory not found: {train_test_dir}")
@@ -143,9 +149,13 @@ def get_latest_train_test(train_test_dir: str, raw_filename: str = None) -> Tupl
 
 def compute_file_hash(path: str) -> str:
     """
-    Compute MD5 hash.
-    - If path is a file: Hash the file.
-    - If path is a directory: Hash all files inside and combine them.
+    Tính mã băm MD5 cho một file hoặc toàn bộ thư mục (để kiểm tra sự thay đổi dữ liệu).
+
+    Args:
+        path (str): Đường dẫn tới file hoặc thư mục.
+
+    Returns:
+        str: Mã hash MD5 (hex string).
     """
     if not os.path.exists(path):
         raise FileNotFoundError(f"Path not found for hashing: {path}")
@@ -287,17 +297,27 @@ def filter_files_by_date(folder: str, from_date: str = None, to_date: str = None
 # ===================== Config Loader =====================
 
 class ConfigLoader:
-    """Load YAML config with basic validation."""
+    """
+    Hỗ trợ tải và kiểm tra tính hợp lệ của file cấu hình YAML.
+
+    Methods:
+        load_config: Tải file YAML và trả về dictionary.
+    """
 
     @staticmethod
     def load_config(config_path: str = "config/config.yaml") -> Dict:
         """
-        Load configuration from YAML file.
+        Đọc file cấu hình YAML.
+
+        Args:
+            config_path (str, optional): Đường dẫn tới file config. Defaults to "config/config.yaml".
+
+        Returns:
+            Dict: Nội dung cấu hình.
 
         Raises:
-            FileNotFoundError: If config file does not exist.
-            ValueError: If YAML is empty or invalid.
-            yaml.YAMLError: If YAML syntax is invalid.
+            FileNotFoundError: Nếu file không tồn tại.
+            ValueError: Nếu file rỗng hoặc không đúng định dạng.
         """
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -359,8 +379,7 @@ class SystemLogFilter:
 
 
 class SystemMsgCleaner(logging.Filter):
-    """Normalize system log messages: strip, collapse blank lines, standardize separators,
-    and drop consecutive duplicates to avoid lines with '=' when no content."""
+    """Bộ làm sạch thông điệp log: Loại bỏ dòng trống thừa, chuẩn hóa các dòng phân cách và khử trùng lặp liên tiếp."""
 
     def filter(self, record):
         try:
@@ -510,11 +529,6 @@ class Logger:
             - Format: [timestamp] | LEVEL | message
             - Audience: End users, Data scientists
 
-        Usage:
-            logger = Logger.get_logger('MAIN', log_dir='artifacts/logs')
-            logger.info("Processing data...")  # Vào cả 2 logs
-            logger.debug("Variable x = 5")     # Chỉ vào system log
-            logger.error("Connection failed")  # System: full detail, Run: redirect message
         """
     _loggers: Dict[str, logging.Logger] = {}
 
@@ -625,10 +639,18 @@ class Logger:
 
 class IOHandler:
     """
-    Handle IO operations:
-    - Read / write tabular data (csv, excel, json, parquet)
-    - Save / load models (joblib, pickle)
-    - Save / load JSON files
+    Lớp tiện ích xử lý các thao tác Nhập/Xuất (I/O) tập trung:
+    - Đọc/Ghi dữ liệu bảng (CSV, Excel, Parquet).
+    - Lưu/Tải mô hình (Joblib, Pickle).
+    - Đọc/Ghi file cấu hình (JSON, YAML).
+
+    Methods:
+        read_data: Đọc dữ liệu từ file vào DataFrame.
+        save_data: Lưu DataFrame xuống file.
+        save_model: Lưu đối tượng mô hình.
+        load_model: Tải đối tượng mô hình.
+        save_json / load_json: Xử lý file JSON.
+        save_yaml: Xử lý file YAML.
     """
 
     _SUPPORTED_EXT = {".csv", ".xlsx", ".xls", ".json", ".parquet"}
@@ -636,11 +658,14 @@ class IOHandler:
     @staticmethod
     def read_data(file_path: str, **kwargs) -> pd.DataFrame:
         """
-        Read data from file into DataFrame.
+        Đọc dữ liệu từ nhiều định dạng file khác nhau (.csv, .xlsx, .parquet).
 
-        Raises:
-            ValueError: If file extension is not supported.
-            IOError: For IO or parsing errors.
+        Args:
+            file_path (str): Đường dẫn file dữ liệu.
+            **kwargs: Các tham số phụ trợ cho hàm đọc của pandas (vd: sheet_name).
+
+        Returns:
+            pd.DataFrame: DataFrame chứa dữ liệu.
         """
         import pandas as pd
         import os
@@ -672,11 +697,11 @@ class IOHandler:
     @staticmethod
     def save_data(df: pd.DataFrame, file_path: str, **kwargs) -> None:
         """
-        Save DataFrame to file.
+        Lưu DataFrame xuống file với định dạng tương ứng đuôi file.
 
-        Raises:
-            ValueError: If file extension is not supported.
-            IOError: For other IO errors.
+        Args:
+            df (pd.DataFrame): Dữ liệu cần lưu.
+            file_path (str): Đường dẫn đích.
         """
         ensure_dir(os.path.dirname(file_path))
         ext = Path(file_path).suffix.lower()
@@ -704,16 +729,12 @@ class IOHandler:
     @staticmethod
     def save_model(model: Any, file_path: str, method: str = "joblib") -> None:
         """
-        Save ML model to file.
+        Tuần tự hóa (Serialize) và lưu mô hình máy học xuống đĩa.
 
         Args:
-            model: Model object to save.
-            file_path: Output path.
-            method: "joblib" or "pickle".
-
-        Raises:
-            ValueError: If method is not supported.
-            IOError: If save fails.
+            model (Any): Đối tượng mô hình.
+            file_path (str): Đường dẫn lưu file.
+            method (str, optional): Phương thức lưu ('joblib' hoặc 'pickle'). Defaults to "joblib".
         """
         ensure_dir(os.path.dirname(file_path))
 
@@ -735,12 +756,14 @@ class IOHandler:
     @staticmethod
     def load_model(file_path: str, method: str = "joblib") -> Any:
         """
-        Load ML model from file.
+        Tải mô hình đã lưu từ đĩa lên bộ nhớ.
 
-        Raises:
-            FileNotFoundError: If file does not exist.
-            ValueError: If method is not supported.
-            IOError: If load fails.
+        Args:
+            file_path (str): Đường dẫn file mô hình.
+            method (str, optional): Phương thức tải ('joblib' hoặc 'pickle'). Defaults to "joblib".
+
+        Returns:
+            Any: Đối tượng mô hình đã tải.
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Model file not found: {file_path}")
@@ -764,7 +787,14 @@ class IOHandler:
 
     @staticmethod
     def save_json(data: Dict, file_path: str, indent: int = 4) -> None:
-        """Save dict to JSON file."""
+        """
+        Ghi dữ liệu dictionary xuống file JSON với định dạng thụt lề (indent) dễ đọc.
+
+        Args:
+            data (Dict): Dữ liệu cần lưu.
+            file_path (str): Đường dẫn file đích.
+            indent (int, optional): Số khoảng trắng thụt đầu dòng
+        """
         ensure_dir(os.path.dirname(file_path))
         try:
             with open(file_path, "w", encoding="utf-8") as f:
@@ -775,11 +805,17 @@ class IOHandler:
     @staticmethod
     def load_json(file_path: str) -> Dict:
         """
-        Load JSON file as dict.
+        Đọc nội dung từ file JSON và chuyển đổi thành Dictionary.
+
+        Args:
+            file_path (str): Đường dẫn file JSON cần đọc.
+
+        Returns:
+            Dict: Dữ liệu đã được tải.
 
         Raises:
-            FileNotFoundError: If file does not exist.
-            IOError: For read / decode errors.
+            FileNotFoundError: Nếu file không tồn tại.
+            IOError: Nếu xảy ra lỗi khi đọc hoặc giải mã JSON.
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"JSON file not found: {file_path}")
@@ -792,7 +828,14 @@ class IOHandler:
 
     @staticmethod
     def save_yaml(data: Dict, file_path: str, indent: int = 4) -> None:
-        """Save dict to YAML file."""
+        """
+        Ghi dữ liệu dictionary xuống file YAML (hỗ trợ Unicode).
+
+        Args:
+            data (Dict): Dữ liệu cần lưu.
+            file_path (str): Đường dẫn file đích.
+            indent (int, optional): Số khoảng trắng thụt đầu dòng. Defaults to 4.
+        """
         ensure_dir(os.path.dirname(file_path))
         try:
             with open(file_path, "w", encoding="utf-8") as f:
@@ -802,9 +845,6 @@ class IOHandler:
 
 
 # Public API for `src/utils.py`
-# Keep file as a single module but expose only intended symbols to other modules.
-# Internal helpers should be prefixed with '_' in future changes.
-
 __all__ = [
     "ensure_dir",
     "set_random_seed",
@@ -823,13 +863,3 @@ __all__ = [
     "IOHandler",
 ]
 
-# NOTE: If import time becomes an issue, move heavy imports (pandas, numpy, joblib, yaml)
-# inside the functions that actually use them (lazy import). This keeps the single-file
-# design but reduces startup cost for CLI/help/quick tasks.
-#
-# Example pattern inside a function:
-# def read_data(...):
-#     import pandas as pd
-#     ...
-#
-# End of utils.py additions.

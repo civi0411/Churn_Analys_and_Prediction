@@ -12,14 +12,33 @@ from ...utils import ensure_dir
 
 
 def sanitize_text(text):
-    """Clean text for markdown output."""
+    """
+    Làm sạch chuỗi văn bản để đảm bảo hiển thị đúng định dạng trong bảng Markdown (loại bỏ ký tự đặc biệt).
+
+    Args:
+        text (str): Chuỗi đầu vào.
+
+    Returns:
+        str: Chuỗi đã được làm sạch.
+    """
     if not isinstance(text, str):
         return str(text)
     return text.replace('|', '').replace('`', '').replace('\n', ' ').strip()
 
 
 def figure_insights(fname, best_metrics, all_metrics, feature_importance):
-    """Return short insights for given figure filename (placeholder)."""
+    """
+    Tự động tạo các nhận xét (insights) ngắn gọn dựa trên loại biểu đồ.
+
+    Args:
+        fname (str): Tên file hình ảnh.
+        best_metrics (dict): Metrics của mô hình tốt nhất.
+        all_metrics (dict): Metrics của tất cả mô hình.
+        feature_importance (pd.DataFrame): Bảng độ quan trọng đặc trưng.
+
+    Returns:
+        List[str]: Danh sách các câu nhận xét/giải thích ý nghĩa biểu đồ.
+    """
     insights = []
     # Example: Add custom logic for each figure type
     if 'missing' in fname:
@@ -40,13 +59,21 @@ def figure_insights(fname, best_metrics, all_metrics, feature_importance):
 
 class ReportGenerator:
     """
-    Tạo báo cáo markdown cho từng run với các ảnh nhúng.
+    Lớp chịu trách nhiệm tổng hợp thông tin từ các bước (EDA, Training) và tạo file báo cáo Markdown chi tiết.
 
     Methods:
-        generate_report(...)
+        generate_report: Tạo báo cáo chính cho pipeline.
+        generate_training_report: Tạo báo cáo chuyên biệt cho bước huấn luyện (hỗ trợ test/json).
     """
 
     def __init__(self, experiments_base_dir: str = "artifacts/experiments", logger=None):
+        """
+        Khởi tạo ReportGenerator.
+
+        Args:
+            experiments_base_dir (str, optional): Đường dẫn thư mục gốc lưu trữ các thí nghiệm. Defaults to "artifacts/experiments".
+            logger (logging.Logger, optional): Logger. Defaults to None.
+        """
         self.experiments_base_dir = experiments_base_dir
         self.logger = logger
         # Ensure base directory exists on init for compatibility with tests
@@ -57,17 +84,9 @@ class ReportGenerator:
             return None
         return os.path.join(self.experiments_base_dir, run_id)
 
-    def generate_report(
-            self,
-            run_id: str,
-            mode: str,
-            optimize: bool = False,
-            best_model_name: str = None,
-            all_metrics: Dict[str, Dict[str, float]] = None,
-            feature_importance: Optional[pd.DataFrame] = None,
-            eda_summary: Optional[Dict[str, Any]] = None,
-            config: Optional[Dict[str, Any]] = None
-    ) -> Optional[str]:
+    def generate_report(self, run_id: str, mode: str, optimize: bool = False, best_model_name: str = None,
+            all_metrics: Dict[str, Dict[str, float]] = None, feature_importance: Optional[pd.DataFrame] = None,
+            eda_summary: Optional[Dict[str, Any]] = None, config: Optional[Dict[str, Any]] = None ) -> Optional[str]:
         """
         Generate comprehensive markdown report based on mode.
 
@@ -166,7 +185,16 @@ class ReportGenerator:
         return report_path
 
     def _generate_eda_section(self, run_dir: str, eda_summary: Dict) -> list:
-        """Generate EDA section with visualizations."""
+        """
+        Tạo nội dung cho phần Phân tích Dữ liệu Khám phá (EDA), bao gồm bảng thống kê và các biểu đồ.
+
+        Args:
+            run_dir (str): Đường dẫn thư mục run hiện tại.
+            eda_summary (Dict): Thông tin tóm tắt EDA.
+
+        Returns:
+            list: Danh sách các dòng text (Markdown lines) cho phần này.
+        """
         lines = []
 
         lines.append("## Exploratory Data Analysis")
@@ -226,7 +254,12 @@ class ReportGenerator:
         return lines
 
     def _generate_training_section(self, run_dir: str, best_model_name: str, all_metrics: Dict[str, Dict[str, float]], feature_importance: Optional[pd.DataFrame] = None) -> list:
-        """Generate training section for markdown report."""
+        """
+        Tạo nội dung cho phần Huấn luyện & Đánh giá mô hình, bao gồm bảng so sánh metrics và biểu đồ đánh giá.
+
+        Returns:
+            list: Danh sách các dòng text (Markdown lines) cho phần này.
+        """
         lines = []
         lines.append("## Model Training & Evaluation")
         lines.append("")
@@ -275,18 +308,16 @@ class ReportGenerator:
         lines.append("")
         return lines
 
-    def generate_training_report(
-            self,
-            run_id: str,
-            best_model_name: str,
-            all_metrics: Dict[str, Dict[str, float]],
-            feature_importance: Optional[pd.DataFrame] = None,
-            config: Optional[Dict[str, Any]] = None,
-            format: str = 'markdown'
-    ) -> Optional[str]:
+    def generate_training_report(self, run_id: str, best_model_name: str, all_metrics: Dict[str, Dict[str, float]],
+            feature_importance: Optional[pd.DataFrame] = None, config: Optional[Dict[str, Any]] = None, format: str = 'markdown' ) -> Optional[str]:
         """
-        Compatibility wrapper used by tests. Produces either a markdown (.md) or JSON (.json)
-        training report under the run directory.
+        Hàm wrapper tạo báo cáo chuyên biệt cho quá trình huấn luyện (thường dùng cho kiểm thử hoặc tích hợp hệ thống khác).
+
+        Args:
+            format (str, optional): Định dạng báo cáo ('markdown' hoặc 'json'). Defaults to 'markdown'.
+
+        Returns:
+            Optional[str]: Đường dẫn file báo cáo được tạo.
         """
         run_dir = self._get_run_dir(run_id)
         if not run_dir:

@@ -39,10 +39,20 @@ from .evaluator import ModelEvaluator
 
 class ModelTrainer:
     """
-    Quản lý quy trình huấn luyện và đánh giá mô hình.
+    Class: ModelTrainer
+    Quản lý toàn bộ vòng đời huấn luyện mô hình: từ load dữ liệu, huấn luyện, tuning đến đánh giá và lưu trữ.
 
     Methods:
-        load_train_test_data(), train_model(), optimize_params(), train_all_models(), evaluate(), select_best_model()
+        load_train_test_data: Tải dữ liệu huấn luyện và kiểm thử.
+        train_model: Huấn luyện một mô hình đơn lẻ (không tuning).
+        optimize_params: Tối ưu hóa tham số (Hyperparameter Tuning) cho mô hình.
+        train_all_models: Huấn luyện hàng loạt mô hình được định nghĩa trong config.
+        evaluate: Đánh giá hiệu năng của một mô hình cụ thể.
+        select_best_model: Chọn ra mô hình tốt nhất dựa trên metrics.
+        get_feature_importance: Trích xuất độ quan trọng của các đặc trưng (Feature Importance).
+        save_model: Lưu mô hình xuống file.
+        load_model: Tải mô hình từ file.
+        save_results: Lưu kết quả đánh giá xuống file JSON.
     """
 
     def __init__(self, config: Dict[str, Any], logger=None):
@@ -79,9 +89,13 @@ class ModelTrainer:
     def load_train_test_data(self, train_path: str = None, test_path: str = None) -> None:
         """Load dữ liệu train/test từ files và tách X, y.
 
+        Args:
+            train_path (str, optional): Đường dẫn file train. Nếu None, tự động tìm file mới nhất.
+            test_path (str, optional): Đường dẫn file test. Nếu None, tự động tìm file mới nhất.
+
         Raises:
-            FileNotFoundError: Nếu không tìm thấy train/test files
-            KeyError: Nếu target column không tồn tại
+            FileNotFoundError: Nếu không tìm thấy file train/test.
+            KeyError: Nếu cột target không tồn tại trong dữ liệu.
         """
         if train_path is None or test_path is None:
             train_test_dir = self.config['data']['train_test_dir']
@@ -105,7 +119,19 @@ class ModelTrainer:
     # ==================== MODEL FACTORY ====================
 
     def _get_model_instance(self, model_name: str, params: Dict = None) -> Any:
-        """Factory tạo model instance: random_forest, logistic_regression, svm, decision_tree, adaboost, xgboost."""
+        """
+        Factory method để tạo instance của model dựa trên tên.
+
+        Args:
+            model_name (str): Tên mô hình (vd: 'random_forest', 'xgboost').
+            params (Dict, optional): Các tham số khởi tạo cho model.
+
+        Returns:
+            Any: Scikit-learn estimator object.
+
+        Raises:
+            ValueError: Nếu tên mô hình không được hỗ trợ.
+        """
         params = params or {}
         rs = self.config.get('data', {}).get('random_state', 42)
 
@@ -125,7 +151,17 @@ class ModelTrainer:
             raise ValueError(f"Unknown model: {model_name}")
 
     def _build_pipeline(self, model_name: str, params: Dict = None, sampler: Any = None) -> Tuple[Any, Dict]:
-        """Tạo Pipeline [Sampler -> Model] cho imbalanced data."""
+        """
+        Tạo Pipeline kết hợp Sampler (nếu có) và Model để xử lý mất cân bằng dữ liệu.
+
+        Args:
+            model_name (str): Tên mô hình.
+            params (Dict, optional): Tham số của model.
+            sampler (Any, optional): Đối tượng sampler (vd: SMOTE) từ imblearn.
+
+        Returns:
+            Tuple[Any, Dict]: (Estimator object, Dictionary tham số đã được prefix đúng chuẩn pipeline).
+        """
         base_model = self._get_model_instance(model_name)
         params = params or {}
 
@@ -141,7 +177,17 @@ class ModelTrainer:
     # ==================== TRAINING & OPTIMIZATION ====================
 
     def train_model(self, model_name: str, params: Dict = None, sampler: Any = None) -> Any:
-        """Train model với tham số mặc định (không tuning)."""
+        """
+        Huấn luyện một mô hình với tham số cố định (không tìm kiếm GridSearch).
+
+        Args:
+            model_name (str): Tên mô hình cần huấn luyện.
+            params (Dict, optional): Tham số mô hình.
+            sampler (Any, optional): Sampler xử lý mất cân bằng.
+
+        Returns:
+            Any: Mô hình đã được huấn luyện (Fitted Estimator).
+        """
         if self.logger: self.logger.info(f"\n[TRAINING] {model_name.upper()}")
 
         estimator, pipe_params = self._build_pipeline(model_name, params, sampler=sampler)
@@ -157,7 +203,16 @@ class ModelTrainer:
         return estimator
 
     def optimize_params(self, model_name: str, sampler: Any = None) -> Tuple[Any, Dict]:
-        """Tìm bộ tham số tốt nhất bằng hyperparameter optimization."""
+        """
+        Tìm bộ tham số tốt nhất cho mô hình bằng Hyperparameter Optimization (Grid/Random Search).
+
+        Args:
+            model_name (str): Tên mô hình.
+            sampler (Any, optional): Sampler xử lý mất cân bằng.
+
+        Returns:
+            Tuple[Any, Dict]: (Mô hình tốt nhất, Bộ tham số tốt nhất).
+        """
         # 1. Build estimator (Pipeline hoặc Model trần)
         estimator, _ = self._build_pipeline(model_name, sampler=sampler)
 
@@ -177,7 +232,16 @@ class ModelTrainer:
 
 
     def train_all_models(self, optimize: bool = True, sampler: Any = None) -> Dict[str, Dict]:
-        """Huấn luyện tất cả các model theo cấu hình và trả về metrics."""
+        """
+        Huấn luyện tất cả các mô hình được định nghĩa trong file cấu hình.
+
+        Args:
+            optimize (bool): Có thực hiện tuning tham số hay không. Defaults to True.
+            sampler (Any, optional): Sampler xử lý mất cân bằng.
+
+        Returns:
+            Dict[str, Dict]: Dictionary chứa metrics của tất cả các mô hình đã huấn luyện.
+        """
         model_names = list(self.config.get('models', {}).keys())
         if not model_names: raise ValueError("No models defined in config")
 
@@ -214,7 +278,15 @@ class ModelTrainer:
     # ==================== HELPERS ====================
 
     def evaluate(self, model_name: str) -> Dict:
-        """Đánh giá một model đã train và trả về kết quả evaluation."""
+        """
+        Đánh giá lại một mô hình đã có trong danh sách self.models.
+
+        Args:
+            model_name (str): Tên mô hình cần đánh giá.
+
+        Returns:
+            Dict: Kết quả đánh giá từ ModelEvaluator.
+        """
         model = self.models.get(model_name)
         if not model:
             raise ValueError(f"Model {model_name} not found")
@@ -224,7 +296,15 @@ class ModelTrainer:
         return eval_result
 
     def select_best_model(self, all_metrics: Dict[str, Dict]) -> None:
-        """Chọn model tốt nhất dựa trên metric cấu hình (mặc định: f1)."""
+        """
+        So sánh metrics của các mô hình và chọn ra mô hình tốt nhất.
+
+        Args:
+            all_metrics (Dict): Dictionary chứa metrics của các mô hình.
+
+        Notes:
+            Metric dùng để so sánh được định nghĩa trong config['tuning']['scoring'] (mặc định là f1).
+        """
         scoring_metric = self.config.get('tuning', {}).get('scoring', 'f1')
         best_score = -1
         best_name = None
@@ -244,7 +324,16 @@ class ModelTrainer:
                 self.logger.info("-" * 70)
 
     def get_feature_importance(self, model_name: str = None, top_n: int = 20) -> Optional[pd.DataFrame]:
-        """Lấy top N feature importance từ model tree-based nếu có."""
+        """
+        Lấy danh sách các đặc trưng quan trọng nhất (Feature Importance) từ mô hình cây (Tree-based).
+
+        Args:
+            model_name (str, optional): Tên mô hình. Nếu None, dùng best model.
+            top_n (int, optional): Số lượng đặc trưng lấy ra. Defaults to 20.
+
+        Returns:
+            Optional[pd.DataFrame]: DataFrame gồm 2 cột ['feature', 'importance'], hoặc None nếu model không hỗ trợ.
+        """
         if model_name is None:
             model_name = self.best_model_name
             model = self.best_model
@@ -269,7 +358,17 @@ class ModelTrainer:
     # ==================== IO ====================
 
     def save_model(self, model_name: str = None, file_path: str = None, method: str = 'joblib') -> str:
-        """Lưu model"""
+        """
+        Lưu đối tượng mô hình xuống file.
+
+        Args:
+            model_name (str, optional): Tên mô hình cần lưu. Defaults to best model.
+            file_path (str, optional): Đường dẫn lưu file. Nếu None, tự tạo tên file theo timestamp.
+            method (str, optional): Phương thức lưu ('joblib' hoặc 'pickle').
+
+        Returns:
+            str: Đường dẫn file đã lưu.
+        """
         if model_name is None: model_name = self.best_model_name
         model = self.models.get(model_name)
 
@@ -286,27 +385,17 @@ class ModelTrainer:
         return file_path
 
     def load_model(self, file_path: str, method: str = 'joblib') -> Any:
-        """Load model"""
+        """
+        Tải mô hình từ file lên bộ nhớ.
+
+        Args:
+            file_path (str): Đường dẫn file mô hình.
+            method (str, optional): Phương thức tải.
+
+        Returns:
+            Any: Đối tượng mô hình đã tải.
+        """
         model = IOHandler.load_model(file_path, method)
         if self.logger: self.logger.info(f"Model Loaded | {file_path}")
         return model
 
-    def save_results(self, file_path: str = None) -> str:
-        """Lưu kết quả evaluation"""
-        if file_path is None:
-            results_dir = self.config.get('artifacts', {}).get('results_dir', 'artifacts/results')
-            ensure_dir(results_dir)
-            timestamp = get_timestamp()
-            file_path = os.path.join(results_dir, f"results_{timestamp}.json")
-
-        # Chuẩn bị JSON (convert numpy types to python types)
-        results_json = {}
-        for model_name, result in self.results.items():
-            results_json[model_name] = {
-                'metrics': result['metrics'],
-                'confusion_matrix': result['confusion_matrix'].tolist()  # JSON serializable
-            }
-
-        IOHandler.save_json(results_json, file_path)
-        if self.logger: self.logger.info(f"Results Saved | {file_path}")
-        return file_path
