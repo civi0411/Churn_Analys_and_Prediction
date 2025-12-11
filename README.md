@@ -245,7 +245,7 @@ graph TB
 
 ## 📂 Project Structure
 
-```text
+```powershell
 Churn_Analys_and_Prediction/
 │
 ├── 📄 .gitignore                        # 🚫 Git ignore rules
@@ -577,6 +577,29 @@ python main.py --mode full --model all --optimize
 # Full pipeline nhanh (không optimize)
 python main.py --mode full --model xgboost
 ```
+**Mode: Predict (Dự đoán trên dữ liệu mới)**
+```powershell
+python main.py --mode predict --data "data/raw/your_new_data.xlsx"  
+# ! Lưu ý phải train dataset trước khi thực hiện predict mẫu data mới
+```
+Chức năng này cho phép bạn sử dụng model đã huấn luyện để dự đoán trên **dữ liệu mới** (chưa từng train/test).
+
+**Tham số:**
+- `--data`: Đường dẫn file dữ liệu đầu vào (csv/xlsx/parquet). Nên là dữ liệu mới hoặc mẫu cần inference.
+
+**Output:**
+- File kết quả dự đoán sẽ được lưu tại: `artifacts/predictions/<ten_file>_predicted.csv`
+- Trong file kết quả sẽ có thêm cột `prediction` (label dự đoán)
+
+**Best Practice:**
+- **Nên** dùng dữ liệu mới (chưa từng train/test) để đánh giá khả năng tổng quát hóa của model.
+- **Không nên** dùng lại dữ liệu đã train/test để tránh data leakage.
+- Có thể dùng sample nhỏ để kiểm thử kỹ thuật, nhưng nên là sample từ dữ liệu mới.
+
+**Troubleshooting:**
+- Nếu gặp lỗi về cột thiếu, hãy đảm bảo file input có đủ các cột như lúc train (trừ cột target).
+- Nếu gặp lỗi thì xem thực hiện train trước với dataset mẫu rồi thực hiện predict dât mới nhé
+
 
 ## 🧪 Testing (Kiểm thử)
 
@@ -596,7 +619,6 @@ tests/
 │   └── test_mlops/              # ExperimentTracker, ModelRegistry, ModelMonitor
 ├── test_visualization/
 ```
-
 ### 🏃 Cách chạy Tests
 
 ```powershell
@@ -613,82 +635,69 @@ pytest tests/test_data/test_preprocessor.py -v
 # Chạy test case cụ thể
 pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data -v
 ```
-
-
-## 🔮 Dự đoán với dữ liệu mới (Prediction/Inference)
-
-### 6️⃣ **Mode: Predict (Dự đoán trên dữ liệu mới)**
-
-Chức năng này cho phép bạn sử dụng model đã huấn luyện để dự đoán trên **dữ liệu mới** (chưa từng train/test).
+## 📖 Hướng dẫn Đọc & Phân tích Output
+Sau khi chạy pipeline, toàn bộ kết quả, log và model sẽ được lưu tự động vào thư mục `artifacts/`. Dưới đây là cấu trúc tổ chức file đầu ra:
 
 ```powershell
-python main.py --mode predict --data "data/raw/your_new_data.xlsx"
+artifacts/
+├── experiments/                        # Lưu trữ kết quả từng lần chạy (Run History)
+│   ├── 20251211_175911_FULL/           # Ví dụ một Run huấn luyện (Timestamp + Tag)
+│   │   ├── data/                       # Dữ liệu snapshot dùng cho run này
+│   │   ├── figures/                    # Biểu đồ trực quan hóa (EDA & EVAL)
+│   │   ├── models/                     # Các file config và tham số model
+│   │   ├── config_snapshot.yaml        # Snapshot cấu hình tại thời điểm chạy
+│   │   ├── full.log                    # Log riêng của run này (mode_name.log)
+│   │   ├── metrics.json                # Các chỉ số đánh giá (Accuracy, F1...)
+│   │   ├── params.json                 # Các hyperparams đã dùng
+│   │   └── report.md                   # Báo cáo tóm tắt tự động
+│   |── 20251211_180205_PREDICT/        # Ví dụ một Run dự đoán
+│   └── experiments.csv                 # Quản lý thí nghiệm
+├── logs/                               # System Logs (Log hệ thống/Debug)
+│   ├── MAIN_20251211_175911.log
+│   └── ...
+├── monitoring/                         # Giám sát hiệu năng và cảnh báo
+│   ├── alerts_log.csv
+│   └── performance_log.csv
+├── registry/                           # Kho chứa Model Production (Model Registry)
+│   ├── registry.json                   # File quản lý phiên bản model
+│   ├── transformer_state.joblib        # Pipeline xử lý dữ liệu
+│   └── xgboost_v1_20251211_*.joblib    # File model đã huấn luyện
+└── versions/
+    └── versions.json                   # Quản lý version dữ liệu/code
 ```
 
-**Tham số:**
-- `--data`: Đường dẫn file dữ liệu đầu vào (csv/xlsx/parquet). Nên là dữ liệu mới hoặc mẫu cần inference.
-- (Tùy chọn) `--model`: Tên model cụ thể nếu muốn chỉ định (mặc định: model production mới nhất).
+### 1. 🧪 Thư mục `experiments/` (Quan trọng nhất)
+Đây là nơi bạn kiểm tra kết quả huấn luyện hoặc dự đoán. Mỗi lần chạy tạo ra một thư mục con định dạng `YYYYMMDD_HHMMSS_[TAG]`.
 
-**Output:**
-- File kết quả dự đoán sẽ được lưu tại: `artifacts/predictions/<ten_file>_predicted.csv`
-- Trong file kết quả sẽ có thêm cột `prediction` (label dự đoán) và `probability` (nếu model hỗ trợ).
+* **`report.md` 
+(Báo cáo tổng hợp nhanh tất cả từ EDA - TRAIN - MODEL - EVAL):**
+    Đây là file tóm tắt nhanh kết quả chạy.
+    > **💡 Mẹo xem file:**
+    > * **Khuyên dùng:** Mở bằng **VSCode** và nhấn tổ hợp `Ctrl+Shift+V` để xem chế độ Preview đẹp nhất.
+    > * **Lưu ý:** Nếu dùng **PyCharm**, chế độ preview mặc định thường hiển thị không tốt (bị vỡ layout). Bạn nên cài thêm plugin Markdown hoặc mở bằng editor khác.
 
-**Best Practice:**
-- **Nên** dùng dữ liệu mới (chưa từng train/test) để đánh giá khả năng tổng quát hóa của model.
-- **Không nên** dùng lại dữ liệu đã train/test để tránh data leakage.
-- Có thể dùng sample nhỏ để kiểm thử kỹ thuật, nhưng nên là sample từ dữ liệu mới.
+* **`figures/`**: Thư mục chứa các file ảnh biểu đồ `.png`.
+    * *Cách xem:* Double-click để mở bằng trình xem ảnh mặc định, hoặc dùng lệnh `Invoke-Item` nếu đang ở PowerShell.
 
-**Troubleshooting:**
-- Nếu gặp lỗi về cột thiếu, hãy đảm bảo file input có đủ các cột như lúc train (trừ cột target).
-- Nếu model không hỗ trợ predict_proba, file output sẽ chỉ có cột `prediction`.
-- Nếu không tìm thấy model, kiểm tra lại thư mục `artifacts/model_registry/`.
+* **`metrics.json` / `params.json`**: Chứa các con số chính xác về hiệu năng và tham số.
+    * *Cách xem:* Mở bằng VSCode, Notepad hoặc kéo thả vào trình duyệt web để xem cấu trúc JSON.
 
-**Ví dụ:**
-```powershell
-# Dự đoán trên file Excel mới
-python main.py --mode predict --data "data/raw/customer_batch_2025.xlsx"
+* **Kết quả dự đoán (`*_PREDICT` folders):**
+    Nếu bạn chạy pipeline dự đoán, kết quả thường nằm trong file `experiments.csv`.
+    * *Cách xem:* Tốt nhất mở bằng **Excel**. Nếu file quá lớn, hãy dùng Python (Pandas) hoặc PowerShell để đọc vài dòng đầu (`Get-Content experiments.csv -Head 10`).
 
-# Dự đoán trên file CSV
-python main.py --mode predict --data "data/raw/new_customers.csv"
+### 2. 🏭 Thư mục `registry/` (Model Registry)
+Nơi lưu trữ "tài sản" quan trọng nhất: các model đã sẵn sàng hoặc đang được sử dụng.
 
-# Kết quả sẽ nằm ở: artifacts/predictions/customer_batch_2025_predicted.csv
-```
+* **`registry.json`**: File quan trọng nhất để hệ thống biết model nào đang là **Production** (đang chạy thực tế) hay **Staging**. Mở file này bằng Text Editor để kiểm tra phiên bản.
+* **`*.joblib`**: Các file model nhị phân thực tế. **Không sửa đổi thủ công** các file này.
 
-### Nhanh — Artifacts (dành cho người dùng, không cần kỹ thuật)
+### 3. 📈 Thư mục `monitoring/` (Giám sát)
+Dùng để theo dõi sức khỏe của mô hình theo thời gian.
 
-> Ghi chú nhanh: nếu bạn chỉ muốn biết "file kết quả ở đâu" và "làm sao để mở" thì đọc phần ngắn gọn này.
+* **`performance_log.csv`**: Lịch sử độ chính xác của model qua các lần đánh giá.
+* **`alerts_log.csv`**: Ghi lại các cảnh báo (ví dụ: Data Drift - dữ liệu bị thay đổi phân phối).
+    > **💡 Mẹo:** Các file này định dạng `.csv`, bạn nên mở bằng **Excel** để lọc/sort dữ liệu dễ dàng, hoặc dùng extension **Rainbow CSV** trong VSCode để xem nhanh.
 
-- `artifacts/experiments/` — Mỗi lần chạy tạo 1 thư mục theo timestamp (ví dụ `20251211_175911_FULL`). Mở thư mục đó để xem:
-  - `report.md` (báo cáo tóm tắt): tốt nhất mở bằng VSCode và nhấn Ctrl+Shift+V để xem preview đẹp; nếu dùng PyCharm, phiên bản mặc định thường không hiển thị preview tốt — bạn có thể mở file bằng VSCode hoặc cài plugin Markdown (hoặc mở bằng Notepad/Editor khác).
-  - `figures/`: ảnh biểu đồ (double-click mở bằng Image Viewer hoặc dùng `Invoke-Item` trên PowerShell).
-  - `metrics.json` hoặc `metrics.csv`: xem bằng VSCode/Notepad hoặc Excel.
-
-- `artifacts/registry/` — Nơi lưu model production (ví dụ `*.joblib`) và `registry.json` (danh sách phiên bản). Mở `registry.json` bằng editor để biết model nào đang được dùng.
-
-- `artifacts/monitoring/` — Lưu log giám sát (`performance_log.csv`, `alerts_log.csv`). Mở bằng Excel, VSCode, hoặc PowerShell `Import-Csv` để xem nhanh.
-
-- `artifacts/predictions/` hoặc `artifacts/experiments/*_PREDICT/` — Kết quả dự đoán (CSV/Parquet/Excel). Mở bằng Excel hoặc đọc 1 vài dòng bằng PowerShell/Pandas nếu file lớn.
-
-Mẹo nhanh (PowerShell):
-
-```powershell
-# Liệt kê 5 experiment mới nhất
-Get-ChildItem .\artifacts\experiments | Sort-Object LastWriteTime -Descending | Select-Object -First 5
-
-# Mở report.md trong VSCode (nếu đã cài VSCode)
-code .\artifacts\experiments\<experiment_folder>\report.md
-
-# Mở report.md bằng Notepad (nếu không có VSCode)
-notepad .\artifacts\experiments\<experiment_folder>\report.md
-
-# Xem 10 dòng đầu của file predictions.csv
-Import-Csv .\artifacts\experiments\<experiment_folder>\predictions.csv | Select-Object -First 10
-
-# Mở hình ảnh (mở bằng ứng dụng mặc định của Windows)
-Invoke-Item .\artifacts\experiments\<experiment_folder>\figures\evaluation\roc_curve.png
-```
-
-Lưu ý thêm:
-- Nếu `report.md` chứa ảnh với đường dẫn tương đối, bạn nên mở cả thư mục experiment trong VSCode (Open Folder) để preview hiển thị đúng hình ảnh.
-- PyCharm: Community Edition không có Markdown preview tích hợp mạnh như VSCode; nếu bạn hay dùng PyCharm, cài plugin Markdown hoặc dùng VSCode để xem report.md sẽ nhanh và trực quan hơn.
-
+### 4. 📝 Thư mục `logs/`
+Chứa log thô của toàn bộ quá trình chạy (`MAIN_*.log`). Chỉ cần thiết khi bạn cần **Debug** lỗi (crash app, lỗi thư viện, lỗi code).
