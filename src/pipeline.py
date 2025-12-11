@@ -503,20 +503,24 @@ class Pipeline:
         run_name = f"{get_timestamp()}_{mode.upper()}"
         run_id = self.tracker.start_run(run_name)
 
-        # Use single log record for header to avoid duplicate separator-only lines
-        self._log_header(f"PIPELINE STARTED  Mode: {mode.upper()}  Run ID: {run_id}")
-
-        # 2. Setup Run-specific Logging & Config Snapshot
+        # === Ensure run-specific logging is attached BEFORE we write the header ===
         if self.tracker.current_run_dir:
-            # Snapshot config
+            # Snapshot config early so run folder exists and config saved before logs
             config_snapshot_path = os.path.join(self.tracker.current_run_dir, "config_snapshot.yaml")
             IOHandler.save_yaml(self.config, config_snapshot_path)
 
-            # Redirect Logger to Run Folder
+            # Redirect Logger to Run Folder (add run handler immediately)
             run_log_filename = f"{mode.lower()}.log"
             run_log_path = os.path.join(self.tracker.current_run_dir, run_log_filename)
             Logger.get_logger('MAIN', run_log_path=run_log_path)
-            self.logger.info("✓ Run-specific log initialized")
+            # Note: self.logger references the same Logger instance (by name) so handlers are updated in-place
+
+        # Use single log record for header to avoid duplicate separator-only lines
+        self._log_header(f"PIPELINE STARTED  Mode: {mode.upper()}  Run ID: {run_id}")
+
+        # 2. Setup Run-specific Logging & Config Snapshot (remaining tasks handled above)
+        if self.tracker.current_run_dir:
+            self.logger.info("\u2713 Run-specific log initialized")
 
         # Log params
         self.tracker.log_params({

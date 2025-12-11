@@ -363,23 +363,41 @@ class SystemLogFilter:
         if record.levelno == logging.DEBUG:
             return True
 
-        # For INFO: chỉ giữ các milestone/stage headers
+        # For INFO: allow more permissive matching (case-insensitive) so regular INFO messages are not lost.
         if record.levelno == logging.INFO:
-            milestone_keywords = [
-                'STAGE:',  # Các giai đoạn pipeline
-                'Pipeline',  # Khởi tạo/kết thúc pipeline
-                'Initialized',  # Component initialization
-                'Completed',  # Stage completion
-                '=' * 60,  # Separator lines (headers)
-                '=' * 70,
-            ]
-            return any(kw in msg for kw in milestone_keywords)
+            try:
+                # Normalize and use case-insensitive matching against important keywords
+                lower_msg = msg.lower() if isinstance(msg, str) else ''
+                milestone_keywords = [
+                    'stage:',  # Các giai đoạn pipeline
+                    'pipeline',  # Khởi tạo/kết thúc pipeline
+                    'initialized',  # Component initialization
+                    'completed',  # Stage completion
+                    '=' * 60,  # Separator lines (headers)
+                    '=' * 70,
+                ]
+
+                if any(kw in lower_msg for kw in milestone_keywords):
+                    return True
+
+                # Allow non-empty INFO messages that contain at least one alphanumeric character
+                if isinstance(msg, str) and re.search(r"[A-Za-z0-9]", msg):
+                    return True
+
+            except Exception:
+                # If anything goes wrong, fallback to accepting INFO
+                return True
 
         return False
 
 
 class SystemMsgCleaner(logging.Filter):
     """Bộ làm sạch thông điệp log: Loại bỏ dòng trống thừa, chuẩn hóa các dòng phân cách và khử trùng lặp liên tiếp."""
+
+    def __init__(self):
+        super().__init__()
+        # Track last message per filter instance (so each handler deduplicates independently)
+        self._last_message = None
 
     def filter(self, record):
         try:
@@ -397,11 +415,10 @@ class SystemMsgCleaner(logging.Filter):
             if not msg:
                 return False
 
-            # Deduplicate consecutive same messages (global) to avoid repeated separators
-            global _last_system_message_global
-            if _last_system_message_global == msg:
+            # Deduplicate consecutive same messages per handler instance
+            if self._last_message == msg:
                 return False
-            _last_system_message_global = msg
+            self._last_message = msg
 
             # Replace the record message with cleaned version (keeps exc_info elsewhere)
             record.msg = msg
@@ -862,4 +879,3 @@ __all__ = [
     "Logger",
     "IOHandler",
 ]
-
