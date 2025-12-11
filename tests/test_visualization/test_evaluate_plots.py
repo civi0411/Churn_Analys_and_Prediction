@@ -2,9 +2,7 @@
 tests/test_visualization/test_evaluate_plots.py
 Các unit tests cho `EvaluateVisualizer` (evaluation plots).
 """
-import pytest
 import pandas as pd
-import numpy as np
 import os
 
 from src.visualization.evaluate_plots import EvaluateVisualizer

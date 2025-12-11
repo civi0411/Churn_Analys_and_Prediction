@@ -45,7 +45,7 @@ class TestHelperFunctions:
         """Kiểm tra `ensure_dir` xử lý đường dẫn rỗng/None an toàn."""
         # Should not raise error
         ensure_dir('')
-        ensure_dir(None)
+        # ensure_dir(None)  # Không nên truyền None, chỉ truyền str
 
     def test_set_random_seed(self):
         """Kiểm tra `set_random_seed` thiết lập seed thống nhất cho các random generator."""

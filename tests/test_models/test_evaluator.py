@@ -1,14 +1,11 @@
 """
-tests/test_models/test_evaluator.py
+tests/models/test_evaluator.py
 
 Tests cho evaluator (metrics calculation functions).
 """
 
-import pytest
-import numpy as np
-import logging
-
 from src.models.evaluator import ModelEvaluator
+import logging
 
 
 def test_evaluate_with_predict_proba(trained_model, sample_train_test_split, mock_logger):

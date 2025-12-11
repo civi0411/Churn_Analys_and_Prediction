@@ -1,5 +1,5 @@
 """
-tests/test_ops/test_validator.py
+tests/ops/dataops/test_validator.py
 
 Tests cho `DataValidator` (validate_quality basic smoke test).
 """

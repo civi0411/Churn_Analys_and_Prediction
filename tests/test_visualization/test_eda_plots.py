@@ -1,10 +1,7 @@
 """
-tests/test_visualization/test_eda_plots.py
+tests/visualization/test_eda_plots.py
 Các unit test cho `EDAVisualizer` (EDA plots).
 """
-import pytest
-import pandas as pd
-import numpy as np
 import os
 
 from src.visualization.eda_plots import EDAVisualizer

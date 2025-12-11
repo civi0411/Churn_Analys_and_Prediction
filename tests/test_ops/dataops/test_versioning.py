@@ -1,10 +1,9 @@
 """
-tests/test_ops/test_versioning.py
+tests/ops/dataops/test_versioning.py
 
 Kiểm tra `DataVersioning` (khởi tạo đơn giản).
 """
 
-import pytest
 from src.ops.dataops.versioning import DataVersioning
 
 

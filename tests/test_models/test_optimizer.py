@@ -1,11 +1,9 @@
 """
-tests/test_models/test_optimizer.py
+tests/models/test_optimizer.py
 
 Tests cho optimizer (smoke tests cho search/tuning interface).
 """
 
-import pytest
-import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 from src.models.optimizer import ModelOptimizer

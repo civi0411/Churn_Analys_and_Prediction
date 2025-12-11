@@ -351,7 +351,7 @@ class SystemLogFilter:
 
     Mục đích: Log kỹ thuật chi tiết cho dev/debug
     """
-
+    @staticmethod
     def filter(self, record):
         msg = record.getMessage()
 

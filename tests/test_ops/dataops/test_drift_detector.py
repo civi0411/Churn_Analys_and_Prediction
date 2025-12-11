@@ -5,7 +5,6 @@ Tests cho DataDriftDetector: schema drift, KS test cho numeric, Chi2 cho categor
 """
 import pandas as pd
 import numpy as np
-import os
 
 from src.ops.dataops.drift_detector import DataDriftDetector
 

@@ -1,5 +1,5 @@
 """
-tests/test_ops/report/test_generator.py
+tests/ops/report/test_generator.py
 
 Tests đơn giản cho `ReportGenerator` khởi tạo.
 """
