@@ -328,97 +328,121 @@ Tất cả cấu hình được tập trung trong `config/config.yaml`. Dưới 
 ### 📊 Data Configuration
 ```yaml
 data:
-  target_col: "Churn"                              # Cột target cần dự đoán
-  date_col: "DaySinceLastOrder"                    # Cột ngày tháng (nếu có)
-  raw_path: "data/raw/E Commerce Dataset.xlsx"     # Đường dẫn file input
-  sheet_name: "E Comm"                             # Tên sheet Excel
-  test_size: 0.2                                   # Tỷ lệ test set (20%)
-  random_state: 42                                 # Seed cho reproducibility
+  target_col: "Churn"                        # Dùng cho train/test, transform, split
+  date_col: "DaySinceLastOrder"                 # Dùng cho feature engineering
+  base_dir: "data"                              # Đường dẫn dữ liệu
+  raw_path: "data/raw/E Commerce Dataset.xlsx"  # Đường dẫn file gốc
+  sheet_name: "E Comm"                          # Tên sheet Excel
+  processed_dir: "data/processed"               # Thư mục dữ liệu đã xử lý
+  train_test_dir: "data/train_test"             # Thư mục train/test
+  test_size: 0.2                                # Tỷ lệ test (0.0 - 1.0)
+  random_state: 42                              # Seed cho random
 ```
 
 ### 🔧 Preprocessing Configuration
 ```yaml
 preprocessing:
   clean:
-    remove_duplicates: true                        # Loại bỏ dòng trùng lặp
-    standardize_values: true                       # Chuẩn hóa giá trị (lowercase, strip...)
-  
+    remove_duplicates: true          # Xóa dòng trùng
+    standardize_values: true         # Chuẩn hóa tên cột
   missing_strategy:
-    numerical: "median"                            # Điền giá trị khuyết: median cho số
-    categorical: "mode"                            # Điền giá trị khuyết: mode cho categorical
-  
-  outlier_method: "iqr"                           # Phương pháp xử lý outliers: IQR
-  outlier_threshold: 1.5                          # Ngưỡng IQR (Q1-1.5*IQR, Q3+1.5*IQR)
-  
-  scaler_type: "standard"                         # Loại scaler: standard, minmax, robust
-  categorical_encoding: "label"                   # Encoding: label, onehot
-  
-  create_features: true                           # Tạo features mới
-  feature_selection: true                         # Lọc features quan trọng
-  feature_selection_method: "f_classif"           # Phương pháp: f_classif, mutual_info
-  n_top_features: 15                              # Số features giữ lại
-  
-  use_smote: true                                 # Sử dụng SMOTE để balance classes
-  k_neighbors: 5                                  # Số neighbors cho SMOTE
-  use_tomek: true                                 # Kết hợp Tomek Links (clean boundaries)
+    numerical: "median"              # median hoặc mean
+    categorical: "mode"              # mode hoặc unknown
+  outlier_method: "iqr"              # iqr hoặc zscore
+  outlier_threshold: 1.5             # Ngưỡng cho iqr (thường 1.5) hoặc zscore(thường 3.0)
+  scaler_type: "standard"            # standard, minmax, robust
+  categorical_encoding: "label"      # Chỉ hỗ trợ label
+  create_features: true              # Tạo feature domain
+  feature_selection: true            # Bật chọn đặc trưng
+  feature_selection_method: "f_classif" # f_classif hoặc mutual_info
+  n_top_features: 15                 # Số lượng feature chọn
+  use_smote: true                    # Bật SMOTE
+  k_neighbors: 5                     # Số k cho SMOTE
+  use_tomek: true                    # Bật SMOTETomek
 ```
 
 ### 🤖 Models Configuration
 ```yaml
 models:
   logistic_regression:
-    C: [0.001, 0.01, 0.1, 1, 10]
-    penalty: ["l2"]
-    solver: ["lbfgs", "liblinear"]
-    max_iter: [1000]
+    C: [0.001, 0.01, 0.1, 1, 10]    # Các giá trị để tuning
+    penalty: ["l2"]                 # Chỉ l2
+    solver: ["lbfgs", "liblinear"]  # Các solver
+    max_iter: [1000]                 # Số vòng lặp
+
+  svm:
+    C: [0.1, 1, 10]                  # Các giá trị để tuning
+    kernel: ["rbf", "linear"]        # kernel rbf hoặc linear
+    gamma: ["scale", "auto"]         # gamma scale hoặc auto
+    probability: [true]              # Dự đoán xác suất
+
+  decision_tree:
+    max_depth: [6, 10, 16, null]     # Độ sâu cây
+    min_samples_split: [2, 5, 10]    # Số mẫu split
+    min_samples_leaf: [1, 2, 4]      # Số mẫu leaf
 
   random_forest:
-    n_estimators: [50, 100, 200]
-    max_depth: [10, 20, null]
-    min_samples_split: [2, 5]
-    min_samples_leaf: [1, 2]
+    n_estimators: [50, 100, 200]     # Số cây
+    max_depth: [10, 20, null]        # Độ sâu cây
+    min_samples_split: [2, 5]        # Số mẫu split
+    min_samples_leaf: [1, 2]         # Số mẫu leaf
 
   xgboost:
-    n_estimators: [100, 300, 500]
-    max_depth: [3, 5, 7]
-    learning_rate: [0.01, 0.05, 0.1]
-    eval_metric: ["logloss"]
+    n_estimators: [100, 300, 500]    # Số cây
+    max_depth: [3, 5, 7]             # Độ sâu cây
+    learning_rate: [0.01, 0.05, 0.1] # Tốc độ học
+    eval_metric: ["logloss"]         # Chỉ logloss
+
+  adaboost:
+    n_estimators: [50, 100]          # Số cây
+    learning_rate: [0.01, 0.1, 1.0]  # Tốc độ học
 ```
 
 ### 🔍 Tuning Configuration
 ```yaml
 tuning:
-  method: "randomized"                            # Phương pháp: grid, randomized
-  cv_folds: 5                                     # Số folds cho cross-validation
-  cv_strategy: "stratified"                       # Stratified để giữ tỷ lệ classes
-  n_iter: 20                                      # Số iterations cho RandomizedSearch
-  scoring: "f1"                                   # Metric chính để optimize
-  n_jobs: -1                                      # Sử dụng tất cả CPU cores
+  method: "randomized"               # randomized hoặc grid
+  cv_folds: 5                        # Số fold cho CV
+  cv_strategy: "stratified"          # Chiến lược CV
+  n_iter: 20                         # Số lần lặp
+  scoring: "f1"                      # Tiêu chí đánh giá
+  n_jobs: -1                         # Số job
 ```
 
-### 📦 MLOps Configuration
+### 📦 Ops Configuration
 ```yaml
-experiments:
-  enabled: true
-  base_dir: "artifacts/experiments"
-  experiments_file: "experiments.csv"
+dataops:
+  versions_dir: "artifacts/versions" # Quản lý version dữ liệu
+  drift_detection:
+    enabled: true                    # Bật/tắt kiểm tra drift
+    pvalue_threshold: 0.05           # Ngưỡng kiểm tra drift
+    max_drift_ratio: 0.2             # Tỷ lệ drift tối đa
+    abort_on_critical: true          # Hủy nếu drift lớn
+    sample_frac: 1.0                 # Tỷ lệ sample
+    max_rows: null                   # Giới hạn số dòng
+  business_rules:
+    persist: true                    # Lưu báo cáo rules
+    fail_on_violation: false         # Dừng nếu vi phạm rules
 
 mlops:
-  registry_dir: "artifacts/model_registry"
+  registry_dir: "artifacts/registry" # Lưu trạng thái transformer, model
+
+experiments:
+  enabled: true                      # Bật/tắt tracking
+  base_dir: "artifacts/experiments" # Thư mục tracking
 
 monitoring:
-  enabled: true
-  base_dir: "artifacts/monitoring"
-  performance_log: "performance_log.csv"
+  enabled: true                      # Bật/tắt monitoring
+  base_dir: "artifacts/monitoring"  # Thư mục monitoring
   health_check:
-    f1_min: 0.70                                  # F1 tối thiểu chấp nhận được
-    accuracy_min: 0.75                            # Accuracy tối thiểu
-    drift_max: 0.10                               # Drift tối đa cho phép (10%)
+    f1_min: 0.70                     # Ngưỡng F1
+    accuracy_min: 0.75               # Ngưỡng accuracy
+    drift_max: 0.10                  # Ngưỡng drift
 
 explainability:
-  enabled: true
-  methods: ["shap"]
-  shap_samples: 100                               # Số samples dùng cho SHAP
+  enabled: true                      # Bật/tắt SHAP
+  methods: ["shap"]                 # Chỉ hỗ trợ shap
+  shap_samples: 100                  # Số sample cho SHAP
 ```
 
 ---
@@ -549,7 +573,7 @@ python main.py --mode preprocess
  **Mode: Train (Model Training)**
 ```powershell
 ## Train một model cụ thể (không optimize)
-python main.py --mode train --model 
+python main.py --mode train 
 
 # Train một model với hyperparameter tuning
 python main.py --mode train --model xgboost --optimize
@@ -655,9 +679,9 @@ artifacts/
 ├── logs/                               # System Logs (Log hệ thống/Debug)
 │   ├── MAIN_20251211_175911.log
 │   └── ...
-├── monitoring/                         # Giám sát hiệu năng và cảnh báo
-│   ├── alerts_log.csv
-│   └── performance_log.csv
+├── monitoring/                         
+│   ├── alerts_log.csv                  # Cảnh báo data drift
+│   └── performance_log.csv             # Giám sát hiệu năng
 ├── registry/                           # Kho chứa Model Production (Model Registry)
 │   ├── registry.json                   # File quản lý phiên bản model
 │   ├── transformer_state.joblib        # Pipeline xử lý dữ liệu
