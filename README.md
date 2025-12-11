@@ -653,3 +653,42 @@ python main.py --mode predict --data "data/raw/new_customers.csv"
 
 # Kết quả sẽ nằm ở: artifacts/predictions/customer_batch_2025_predicted.csv
 ```
+
+### Nhanh — Artifacts (dành cho người dùng, không cần kỹ thuật)
+
+> Ghi chú nhanh: nếu bạn chỉ muốn biết "file kết quả ở đâu" và "làm sao để mở" thì đọc phần ngắn gọn này.
+
+- `artifacts/experiments/` — Mỗi lần chạy tạo 1 thư mục theo timestamp (ví dụ `20251211_175911_FULL`). Mở thư mục đó để xem:
+  - `report.md` (báo cáo tóm tắt): tốt nhất mở bằng VSCode và nhấn Ctrl+Shift+V để xem preview đẹp; nếu dùng PyCharm, phiên bản mặc định thường không hiển thị preview tốt — bạn có thể mở file bằng VSCode hoặc cài plugin Markdown (hoặc mở bằng Notepad/Editor khác).
+  - `figures/`: ảnh biểu đồ (double-click mở bằng Image Viewer hoặc dùng `Invoke-Item` trên PowerShell).
+  - `metrics.json` hoặc `metrics.csv`: xem bằng VSCode/Notepad hoặc Excel.
+
+- `artifacts/registry/` — Nơi lưu model production (ví dụ `*.joblib`) và `registry.json` (danh sách phiên bản). Mở `registry.json` bằng editor để biết model nào đang được dùng.
+
+- `artifacts/monitoring/` — Lưu log giám sát (`performance_log.csv`, `alerts_log.csv`). Mở bằng Excel, VSCode, hoặc PowerShell `Import-Csv` để xem nhanh.
+
+- `artifacts/predictions/` hoặc `artifacts/experiments/*_PREDICT/` — Kết quả dự đoán (CSV/Parquet/Excel). Mở bằng Excel hoặc đọc 1 vài dòng bằng PowerShell/Pandas nếu file lớn.
+
+Mẹo nhanh (PowerShell):
+
+```powershell
+# Liệt kê 5 experiment mới nhất
+Get-ChildItem .\artifacts\experiments | Sort-Object LastWriteTime -Descending | Select-Object -First 5
+
+# Mở report.md trong VSCode (nếu đã cài VSCode)
+code .\artifacts\experiments\<experiment_folder>\report.md
+
+# Mở report.md bằng Notepad (nếu không có VSCode)
+notepad .\artifacts\experiments\<experiment_folder>\report.md
+
+# Xem 10 dòng đầu của file predictions.csv
+Import-Csv .\artifacts\experiments\<experiment_folder>\predictions.csv | Select-Object -First 10
+
+# Mở hình ảnh (mở bằng ứng dụng mặc định của Windows)
+Invoke-Item .\artifacts\experiments\<experiment_folder>\figures\evaluation\roc_curve.png
+```
+
+Lưu ý thêm:
+- Nếu `report.md` chứa ảnh với đường dẫn tương đối, bạn nên mở cả thư mục experiment trong VSCode (Open Folder) để preview hiển thị đúng hình ảnh.
+- PyCharm: Community Edition không có Markdown preview tích hợp mạnh như VSCode; nếu bạn hay dùng PyCharm, cài plugin Markdown hoặc dùng VSCode để xem report.md sẽ nhanh và trực quan hơn.
+
