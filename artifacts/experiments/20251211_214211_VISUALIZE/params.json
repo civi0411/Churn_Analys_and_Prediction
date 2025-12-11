@@ -1,0 +1,6 @@
+{
+    "mode": "visualize",
+    "model_name": "xgboost",
+    "optimize": false,
+    "test_size": 0.2
+}

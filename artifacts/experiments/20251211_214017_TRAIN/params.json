@@ -1,0 +1,6 @@
+{
+    "mode": "train",
+    "model_name": "xgboost",
+    "optimize": true,
+    "test_size": 0.2
+}

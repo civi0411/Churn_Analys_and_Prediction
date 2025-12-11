@@ -1,0 +1,678 @@
+{
+    "raw_data": [
+        {
+            "version_id": "v_20251211_213952",
+            "timestamp": "2025-12-11 21:39:52",
+            "hash": "3586e9c1cb117a645b062deae6a961c2",
+            "path": "data/raw/E Commerce Dataset.xlsx",
+            "file_size_mb": 0.53,
+            "description": "Raw input data",
+            "tags": [
+                "raw",
+                "input"
+            ],
+            "metadata": {
+                "rows": 5630,
+                "columns": 20,
+                "column_names": [
+                    "CustomerID",
+                    "Churn",
+                    "Tenure",
+                    "PreferredLoginDevice",
+                    "CityTier",
+                    "WarehouseToHome",
+                    "PreferredPaymentMode",
+                    "Gender",
+                    "HourSpendOnApp",
+                    "NumberOfDeviceRegistered",
+                    "PreferedOrderCat",
+                    "SatisfactionScore",
+                    "MaritalStatus",
+                    "NumberOfAddress",
+                    "Complain",
+                    "OrderAmountHikeFromlastYear",
+                    "CouponUsed",
+                    "OrderCount",
+                    "DaySinceLastOrder",
+                    "CashbackAmount"
+                ],
+                "dtypes": {
+                    "CustomerID": "int64",
+                    "Churn": "int64",
+                    "Tenure": "float64",
+                    "PreferredLoginDevice": "object",
+                    "CityTier": "int64",
+                    "WarehouseToHome": "float64",
+                    "PreferredPaymentMode": "object",
+                    "Gender": "object",
+                    "HourSpendOnApp": "float64",
+                    "NumberOfDeviceRegistered": "int64",
+                    "PreferedOrderCat": "object",
+                    "SatisfactionScore": "int64",
+                    "MaritalStatus": "object",
+                    "NumberOfAddress": "int64",
+                    "Complain": "int64",
+                    "OrderAmountHikeFromlastYear": "float64",
+                    "CouponUsed": "float64",
+                    "OrderCount": "float64",
+                    "DaySinceLastOrder": "float64",
+                    "CashbackAmount": "float64"
+                },
+                "memory_mb": 2.4
+            },
+            "profile": {
+                "null_counts": {
+                    "CustomerID": 0,
+                    "Churn": 0,
+                    "Tenure": 264,
+                    "PreferredLoginDevice": 0,
+                    "CityTier": 0,
+                    "WarehouseToHome": 251,
+                    "PreferredPaymentMode": 0,
+                    "Gender": 0,
+                    "HourSpendOnApp": 255,
+                    "NumberOfDeviceRegistered": 0,
+                    "PreferedOrderCat": 0,
+                    "SatisfactionScore": 0,
+                    "MaritalStatus": 0,
+                    "NumberOfAddress": 0,
+                    "Complain": 0,
+                    "OrderAmountHikeFromlastYear": 265,
+                    "CouponUsed": 256,
+                    "OrderCount": 258,
+                    "DaySinceLastOrder": 307,
+                    "CashbackAmount": 0
+                },
+                "null_percentage": 1.65,
+                "duplicate_rows": 0,
+                "numeric_stats": {
+                    "CustomerID": {
+                        "min": 50001.0,
+                        "max": 55630.0,
+                        "mean": 52815.5,
+                        "std": 1625.39
+                    },
+                    "Churn": {
+                        "min": 0.0,
+                        "max": 1.0,
+                        "mean": 0.17,
+                        "std": 0.37
+                    },
+                    "Tenure": {
+                        "min": 0.0,
+                        "max": 61.0,
+                        "mean": 10.19,
+                        "std": 8.56
+                    },
+                    "CityTier": {
+                        "min": 1.0,
+                        "max": 3.0,
+                        "mean": 1.65,
+                        "std": 0.92
+                    },
+                    "WarehouseToHome": {
+                        "min": 5.0,
+                        "max": 127.0,
+                        "mean": 15.64,
+                        "std": 8.53
+                    },
+                    "HourSpendOnApp": {
+                        "min": 0.0,
+                        "max": 5.0,
+                        "mean": 2.93,
+                        "std": 0.72
+                    },
+                    "NumberOfDeviceRegistered": {
+                        "min": 1.0,
+                        "max": 6.0,
+                        "mean": 3.69,
+                        "std": 1.02
+                    },
+                    "SatisfactionScore": {
+                        "min": 1.0,
+                        "max": 5.0,
+                        "mean": 3.07,
+                        "std": 1.38
+                    },
+                    "NumberOfAddress": {
+                        "min": 1.0,
+                        "max": 22.0,
+                        "mean": 4.21,
+                        "std": 2.58
+                    },
+                    "Complain": {
+                        "min": 0.0,
+                        "max": 1.0,
+                        "mean": 0.28,
+                        "std": 0.45
+                    }
+                },
+                "categorical_stats": {
+                    "PreferredLoginDevice": {
+                        "unique": 3,
+                        "top_values": {
+                            "Mobile Phone": 2765,
+                            "Computer": 1634,
+                            "Phone": 1231
+                        }
+                    },
+                    "PreferredPaymentMode": {
+                        "unique": 7,
+                        "top_values": {
+                            "Debit Card": 2314,
+                            "Credit Card": 1501,
+                            "E wallet": 614
+                        }
+                    },
+                    "Gender": {
+                        "unique": 2,
+                        "top_values": {
+                            "Male": 3384,
+                            "Female": 2246
+                        }
+                    },
+                    "PreferedOrderCat": {
+                        "unique": 6,
+                        "top_values": {
+                            "Laptop & Accessory": 2050,
+                            "Mobile Phone": 1271,
+                            "Fashion": 826
+                        }
+                    },
+                    "MaritalStatus": {
+                        "unique": 3,
+                        "top_values": {
+                            "Married": 2986,
+                            "Single": 1796,
+                            "Divorced": 848
+                        }
+                    }
+                }
+            }
+        }
+    ],
+    "cleaned_data": [
+        {
+            "version_id": "v_20251211_213953",
+            "timestamp": "2025-12-11 21:39:53",
+            "hash": "133458b7f75db1b4a5ff4ee771669322",
+            "path": "data/processed\\E Commerce Dataset_cleaned.parquet",
+            "file_size_mb": 0.09,
+            "description": "Data after cleaning",
+            "tags": [
+                "cleaned",
+                "processed"
+            ],
+            "metadata": {
+                "rows": 5630,
+                "columns": 20,
+                "column_names": [
+                    "CustomerID",
+                    "Churn",
+                    "Tenure",
+                    "PreferredLoginDevice",
+                    "CityTier",
+                    "WarehouseToHome",
+                    "PreferredPaymentMode",
+                    "Gender",
+                    "HourSpendOnApp",
+                    "NumberOfDeviceRegistered",
+                    "PreferedOrderCat",
+                    "SatisfactionScore",
+                    "MaritalStatus",
+                    "NumberOfAddress",
+                    "Complain",
+                    "OrderAmountHikeFromlastYear",
+                    "CouponUsed",
+                    "OrderCount",
+                    "DaySinceLastOrder",
+                    "CashbackAmount"
+                ],
+                "dtypes": {
+                    "CustomerID": "int64",
+                    "Churn": "int64",
+                    "Tenure": "float64",
+                    "PreferredLoginDevice": "object",
+                    "CityTier": "int64",
+                    "WarehouseToHome": "float64",
+                    "PreferredPaymentMode": "object",
+                    "Gender": "object",
+                    "HourSpendOnApp": "float64",
+                    "NumberOfDeviceRegistered": "int64",
+                    "PreferedOrderCat": "object",
+                    "SatisfactionScore": "int64",
+                    "MaritalStatus": "object",
+                    "NumberOfAddress": "int64",
+                    "Complain": "int64",
+                    "OrderAmountHikeFromlastYear": "float64",
+                    "CouponUsed": "float64",
+                    "OrderCount": "float64",
+                    "DaySinceLastOrder": "float64",
+                    "CashbackAmount": "float64"
+                },
+                "memory_mb": 2.41
+            },
+            "profile": {
+                "null_counts": {
+                    "CustomerID": 0,
+                    "Churn": 0,
+                    "Tenure": 264,
+                    "PreferredLoginDevice": 0,
+                    "CityTier": 0,
+                    "WarehouseToHome": 251,
+                    "PreferredPaymentMode": 0,
+                    "Gender": 0,
+                    "HourSpendOnApp": 255,
+                    "NumberOfDeviceRegistered": 0,
+                    "PreferedOrderCat": 0,
+                    "SatisfactionScore": 0,
+                    "MaritalStatus": 0,
+                    "NumberOfAddress": 0,
+                    "Complain": 0,
+                    "OrderAmountHikeFromlastYear": 265,
+                    "CouponUsed": 256,
+                    "OrderCount": 258,
+                    "DaySinceLastOrder": 307,
+                    "CashbackAmount": 0
+                },
+                "null_percentage": 1.65,
+                "duplicate_rows": 0,
+                "numeric_stats": {
+                    "CustomerID": {
+                        "min": 50001.0,
+                        "max": 55630.0,
+                        "mean": 52815.5,
+                        "std": 1625.39
+                    },
+                    "Churn": {
+                        "min": 0.0,
+                        "max": 1.0,
+                        "mean": 0.17,
+                        "std": 0.37
+                    },
+                    "Tenure": {
+                        "min": 0.0,
+                        "max": 61.0,
+                        "mean": 10.19,
+                        "std": 8.56
+                    },
+                    "CityTier": {
+                        "min": 1.0,
+                        "max": 3.0,
+                        "mean": 1.65,
+                        "std": 0.92
+                    },
+                    "WarehouseToHome": {
+                        "min": 5.0,
+                        "max": 127.0,
+                        "mean": 15.64,
+                        "std": 8.53
+                    },
+                    "HourSpendOnApp": {
+                        "min": 0.0,
+                        "max": 5.0,
+                        "mean": 2.93,
+                        "std": 0.72
+                    },
+                    "NumberOfDeviceRegistered": {
+                        "min": 1.0,
+                        "max": 6.0,
+                        "mean": 3.69,
+                        "std": 1.02
+                    },
+                    "SatisfactionScore": {
+                        "min": 1.0,
+                        "max": 5.0,
+                        "mean": 3.07,
+                        "std": 1.38
+                    },
+                    "NumberOfAddress": {
+                        "min": 1.0,
+                        "max": 22.0,
+                        "mean": 4.21,
+                        "std": 2.58
+                    },
+                    "Complain": {
+                        "min": 0.0,
+                        "max": 1.0,
+                        "mean": 0.28,
+                        "std": 0.45
+                    }
+                },
+                "categorical_stats": {
+                    "PreferredLoginDevice": {
+                        "unique": 2,
+                        "top_values": {
+                            "Mobile Phone": 3996,
+                            "Computer": 1634
+                        }
+                    },
+                    "PreferredPaymentMode": {
+                        "unique": 5,
+                        "top_values": {
+                            "Debit Card": 2314,
+                            "Credit Card": 1774,
+                            "E wallet": 614
+                        }
+                    },
+                    "Gender": {
+                        "unique": 2,
+                        "top_values": {
+                            "Male": 3384,
+                            "Female": 2246
+                        }
+                    },
+                    "PreferedOrderCat": {
+                        "unique": 6,
+                        "top_values": {
+                            "Laptop & Accessory": 2050,
+                            "Mobile Phone": 1271,
+                            "Fashion": 826
+                        }
+                    },
+                    "MaritalStatus": {
+                        "unique": 3,
+                        "top_values": {
+                            "Married": 2986,
+                            "Single": 1796,
+                            "Divorced": 848
+                        }
+                    }
+                }
+            },
+            "lineage": {
+                "parent": "raw_data",
+                "transformation": "cleaning",
+                "created_at": "2025-12-11 21:42:39"
+            }
+        }
+    ],
+    "train_data": [
+        {
+            "version_id": "v_20251211_213953",
+            "timestamp": "2025-12-11 21:39:53",
+            "hash": "f5badd8af7a8439ebcbdd57b810d6b88",
+            "path": "data/train_test\\E Commerce Dataset_train.parquet",
+            "file_size_mb": 0.09,
+            "description": "Training dataset (transformed)",
+            "tags": [
+                "train",
+                "final"
+            ],
+            "metadata": {
+                "rows": 4504,
+                "columns": 16,
+                "column_names": [
+                    "Tenure",
+                    "CityTier",
+                    "WarehouseToHome",
+                    "NumberOfDeviceRegistered",
+                    "PreferedOrderCat",
+                    "SatisfactionScore",
+                    "MaritalStatus",
+                    "Complain",
+                    "DaySinceLastOrder",
+                    "CashbackAmount",
+                    "order_frequency_mpm",
+                    "engagement_score",
+                    "log_DaySinceLastOrder",
+                    "log_WarehouseToHome",
+                    "log_CashbackAmount",
+                    "Churn"
+                ],
+                "dtypes": {
+                    "Tenure": "float64",
+                    "CityTier": "float64",
+                    "WarehouseToHome": "float64",
+                    "NumberOfDeviceRegistered": "float64",
+                    "PreferedOrderCat": "float64",
+                    "SatisfactionScore": "float64",
+                    "MaritalStatus": "float64",
+                    "Complain": "float64",
+                    "DaySinceLastOrder": "float64",
+                    "CashbackAmount": "float64",
+                    "order_frequency_mpm": "float64",
+                    "engagement_score": "float64",
+                    "log_DaySinceLastOrder": "float64",
+                    "log_WarehouseToHome": "float64",
+                    "log_CashbackAmount": "float64",
+                    "Churn": "int64"
+                },
+                "memory_mb": 0.58
+            },
+            "profile": {
+                "null_counts": {
+                    "Tenure": 0,
+                    "CityTier": 0,
+                    "WarehouseToHome": 0,
+                    "NumberOfDeviceRegistered": 0,
+                    "PreferedOrderCat": 0,
+                    "SatisfactionScore": 0,
+                    "MaritalStatus": 0,
+                    "Complain": 0,
+                    "DaySinceLastOrder": 0,
+                    "CashbackAmount": 0,
+                    "order_frequency_mpm": 0,
+                    "engagement_score": 0,
+                    "log_DaySinceLastOrder": 0,
+                    "log_WarehouseToHome": 0,
+                    "log_CashbackAmount": 0,
+                    "Churn": 0
+                },
+                "null_percentage": 0.0,
+                "duplicate_rows": 822,
+                "numeric_stats": {
+                    "Tenure": {
+                        "min": -1.22,
+                        "max": 2.75,
+                        "mean": 0.0,
+                        "std": 1.0
+                    },
+                    "CityTier": {
+                        "min": -0.72,
+                        "max": 1.45,
+                        "mean": -0.0,
+                        "std": 1.0
+                    },
+                    "WarehouseToHome": {
+                        "min": -1.31,
+                        "max": 2.57,
+                        "mean": 0.0,
+                        "std": 1.0
+                    },
+                    "NumberOfDeviceRegistered": {
+                        "min": -2.33,
+                        "max": 1.9,
+                        "mean": 0.0,
+                        "std": 1.0
+                    },
+                    "PreferedOrderCat": {
+                        "min": 0.0,
+                        "max": 5.0,
+                        "mean": 2.35,
+                        "std": 1.42
+                    },
+                    "SatisfactionScore": {
+                        "min": -1.49,
+                        "max": 1.4,
+                        "mean": -0.0,
+                        "std": 1.0
+                    },
+                    "MaritalStatus": {
+                        "min": 0.0,
+                        "max": 2.0,
+                        "mean": 1.17,
+                        "std": 0.66
+                    },
+                    "Complain": {
+                        "min": -0.62,
+                        "max": 1.6,
+                        "mean": -0.0,
+                        "std": 1.0
+                    },
+                    "DaySinceLastOrder": {
+                        "min": -1.3,
+                        "max": 2.95,
+                        "mean": -0.0,
+                        "std": 1.0
+                    },
+                    "CashbackAmount": {
+                        "min": -2.4,
+                        "max": 2.22,
+                        "mean": 0.0,
+                        "std": 1.0
+                    }
+                }
+            },
+            "lineage": {
+                "parent": "cleaned_data",
+                "transformation": "split+transform",
+                "created_at": "2025-12-11 21:42:40"
+            }
+        }
+    ],
+    "test_data": [
+        {
+            "version_id": "v_20251211_213953",
+            "timestamp": "2025-12-11 21:39:53",
+            "hash": "5219bef96164d6519ad5c00736f997fb",
+            "path": "data/train_test\\E Commerce Dataset_test.parquet",
+            "file_size_mb": 0.04,
+            "description": "Test dataset (transformed)",
+            "tags": [
+                "test",
+                "final"
+            ],
+            "metadata": {
+                "rows": 1126,
+                "columns": 16,
+                "column_names": [
+                    "Tenure",
+                    "CityTier",
+                    "WarehouseToHome",
+                    "NumberOfDeviceRegistered",
+                    "PreferedOrderCat",
+                    "SatisfactionScore",
+                    "MaritalStatus",
+                    "Complain",
+                    "DaySinceLastOrder",
+                    "CashbackAmount",
+                    "order_frequency_mpm",
+                    "engagement_score",
+                    "log_DaySinceLastOrder",
+                    "log_WarehouseToHome",
+                    "log_CashbackAmount",
+                    "Churn"
+                ],
+                "dtypes": {
+                    "Tenure": "float64",
+                    "CityTier": "float64",
+                    "WarehouseToHome": "float64",
+                    "NumberOfDeviceRegistered": "float64",
+                    "PreferedOrderCat": "int64",
+                    "SatisfactionScore": "float64",
+                    "MaritalStatus": "int64",
+                    "Complain": "float64",
+                    "DaySinceLastOrder": "float64",
+                    "CashbackAmount": "float64",
+                    "order_frequency_mpm": "float64",
+                    "engagement_score": "float64",
+                    "log_DaySinceLastOrder": "float64",
+                    "log_WarehouseToHome": "float64",
+                    "log_CashbackAmount": "float64",
+                    "Churn": "int64"
+                },
+                "memory_mb": 0.15
+            },
+            "profile": {
+                "null_counts": {
+                    "Tenure": 0,
+                    "CityTier": 0,
+                    "WarehouseToHome": 0,
+                    "NumberOfDeviceRegistered": 0,
+                    "PreferedOrderCat": 0,
+                    "SatisfactionScore": 0,
+                    "MaritalStatus": 0,
+                    "Complain": 0,
+                    "DaySinceLastOrder": 0,
+                    "CashbackAmount": 0,
+                    "order_frequency_mpm": 0,
+                    "engagement_score": 0,
+                    "log_DaySinceLastOrder": 0,
+                    "log_WarehouseToHome": 0,
+                    "log_CashbackAmount": 0,
+                    "Churn": 0
+                },
+                "null_percentage": 0.0,
+                "duplicate_rows": 45,
+                "numeric_stats": {
+                    "Tenure": {
+                        "min": -1.22,
+                        "max": 2.75,
+                        "mean": -0.0,
+                        "std": 0.99
+                    },
+                    "CityTier": {
+                        "min": -0.72,
+                        "max": 1.45,
+                        "mean": -0.06,
+                        "std": 0.98
+                    },
+                    "WarehouseToHome": {
+                        "min": -1.31,
+                        "max": 2.57,
+                        "mean": -0.05,
+                        "std": 0.98
+                    },
+                    "NumberOfDeviceRegistered": {
+                        "min": -2.33,
+                        "max": 1.9,
+                        "mean": -0.04,
+                        "std": 0.98
+                    },
+                    "PreferedOrderCat": {
+                        "min": 0.0,
+                        "max": 5.0,
+                        "mean": 2.44,
+                        "std": 1.39
+                    },
+                    "SatisfactionScore": {
+                        "min": -1.49,
+                        "max": 1.4,
+                        "mean": -0.0,
+                        "std": 0.99
+                    },
+                    "MaritalStatus": {
+                        "min": 0.0,
+                        "max": 2.0,
+                        "mean": 1.17,
+                        "std": 0.68
+                    },
+                    "Complain": {
+                        "min": -0.62,
+                        "max": 1.6,
+                        "mean": 0.05,
+                        "std": 1.02
+                    },
+                    "DaySinceLastOrder": {
+                        "min": -1.3,
+                        "max": 2.95,
+                        "mean": 0.0,
+                        "std": 1.03
+                    },
+                    "CashbackAmount": {
+                        "min": -2.4,
+                        "max": 2.22,
+                        "mean": -0.02,
+                        "std": 1.0
+                    }
+                }
+            },
+            "lineage": {
+                "parent": "cleaned_data",
+                "transformation": "split+transform",
+                "created_at": "2025-12-11 21:42:40"
+            }
+        }
+    ]
+}

@@ -1,0 +1,56 @@
+{
+    "xgboost": [
+        {
+            "version": 1,
+            "timestamp": "20251211_214027",
+            "path": "artifacts/registry\\xgboost_v1_20251211_214027.joblib",
+            "metrics": {
+                "accuracy": 0.9742451154529307,
+                "precision": 0.9447513812154696,
+                "recall": 0.9,
+                "f1": 0.921832884097035,
+                "roc_auc": 0.9936122357174989
+            },
+            "run_id": "20251211_214017_TRAIN"
+        },
+        {
+            "version": 2,
+            "timestamp": "20251211_214149",
+            "path": "artifacts/registry\\xgboost_v2_20251211_214149.joblib",
+            "metrics": {
+                "accuracy": 0.9769094138543517,
+                "precision": 0.9505494505494505,
+                "recall": 0.9105263157894737,
+                "f1": 0.9301075268817204,
+                "roc_auc": 0.9895411605937922
+            },
+            "run_id": "20251211_214047_TRAIN"
+        },
+        {
+            "version": 3,
+            "timestamp": "20251211_214211",
+            "path": "artifacts/registry\\xgboost_v3_20251211_214211.joblib",
+            "metrics": {
+                "accuracy": 0.9547069271758437,
+                "precision": 0.8926553672316384,
+                "recall": 0.8315789473684211,
+                "f1": 0.8610354223433242,
+                "roc_auc": 0.9914248762932973
+            },
+            "run_id": "20251211_214211_VISUALIZE"
+        },
+        {
+            "version": 4,
+            "timestamp": "20251211_214348",
+            "path": "artifacts/registry\\xgboost_v4_20251211_214348.joblib",
+            "metrics": {
+                "accuracy": 0.9769094138543517,
+                "precision": 0.9505494505494505,
+                "recall": 0.9105263157894737,
+                "f1": 0.9301075268817204,
+                "roc_auc": 0.9895411605937922
+            },
+            "run_id": "20251211_214231_FULL"
+        }
+    ]
+}

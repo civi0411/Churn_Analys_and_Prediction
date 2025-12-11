@@ -1,0 +1,18 @@
+{
+    "passed": false,
+    "range_violations": {},
+    "logic_violations": {
+        "OrderCount_for_Cashback": {
+            "count": 258,
+            "examples": [
+                64,
+                90,
+                110,
+                120,
+                143
+            ]
+        }
+    },
+    "format_violations": {},
+    "referential_violations": {}
+}

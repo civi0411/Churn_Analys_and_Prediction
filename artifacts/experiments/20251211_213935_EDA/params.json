@@ -1,0 +1,6 @@
+{
+    "mode": "eda",
+    "model_name": "all",
+    "optimize": false,
+    "test_size": 0.2
+}

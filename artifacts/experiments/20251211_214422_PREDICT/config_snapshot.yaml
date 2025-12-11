@@ -1,0 +1,149 @@
+data:
+    base_dir: data
+    date_col: DaySinceLastOrder
+    original_raw_path: data/raw/E Commerce Dataset.xlsx
+    processed_dir: data/processed
+    random_state: 42
+    raw_path: data/raw/predicted_data.xlsx
+    sheet_name: E Comm
+    target_col: Churn
+    test_size: 0.2
+    train_test_dir: data/train_test
+dataops:
+    business_rules:
+        fail_on_violation: false
+        persist: true
+    drift_detection:
+        abort_on_critical: true
+        enabled: true
+        max_drift_ratio: 0.2
+        max_rows: null
+        pvalue_threshold: 0.05
+        sample_frac: 1.0
+    versions_dir: artifacts/versions
+experiments:
+    base_dir: artifacts/experiments
+    enabled: true
+explainability:
+    enabled: true
+    methods:
+    - shap
+    shap_samples: 100
+logging:
+    dir: artifacts/logs
+    format: '[%(asctime)s] | %(levelname)-7s | %(name)-15s | %(message)s'
+    level: INFO
+mlops:
+    registry_dir: artifacts/registry
+models:
+    adaboost:
+        learning_rate:
+        - 0.01
+        - 0.1
+        - 1.0
+        n_estimators:
+        - 50
+        - 100
+    decision_tree:
+        max_depth:
+        - 6
+        - 10
+        - 16
+        - null
+        min_samples_leaf:
+        - 1
+        - 2
+        - 4
+        min_samples_split:
+        - 2
+        - 5
+        - 10
+    logistic_regression:
+        C:
+        - 0.001
+        - 0.01
+        - 0.1
+        - 1
+        - 10
+        max_iter:
+        - 1000
+        penalty:
+        - l2
+        solver:
+        - lbfgs
+        - liblinear
+    random_forest:
+        max_depth:
+        - 10
+        - 20
+        - null
+        min_samples_leaf:
+        - 1
+        - 2
+        min_samples_split:
+        - 2
+        - 5
+        n_estimators:
+        - 50
+        - 100
+        - 200
+    svm:
+        C:
+        - 0.1
+        - 1
+        - 10
+        gamma:
+        - scale
+        - auto
+        kernel:
+        - rbf
+        - linear
+        probability:
+        - true
+    xgboost:
+        eval_metric:
+        - logloss
+        learning_rate:
+        - 0.01
+        - 0.05
+        - 0.1
+        max_depth:
+        - 3
+        - 5
+        - 7
+        n_estimators:
+        - 100
+        - 300
+        - 500
+monitoring:
+    base_dir: artifacts/monitoring
+    enabled: true
+    health_check:
+        accuracy_min: 0.75
+        drift_max: 0.1
+        f1_min: 0.7
+preprocessing:
+    categorical_encoding: label
+    clean:
+        remove_duplicates: true
+        standardize_values: true
+    create_features: true
+    feature_selection: true
+    feature_selection_method: f_classif
+    k_neighbors: 5
+    missing_strategy:
+        categorical: mode
+        numerical: median
+    n_top_features: 15
+    outlier_method: iqr
+    outlier_threshold: 1.5
+    scaler_type: standard
+    use_smote: true
+    use_tomek: true
+tuning:
+    cv_folds: 5
+    cv_strategy: stratified
+    method: randomized
+    n_iter: 20
+    n_jobs: -1
+    scoring: f1

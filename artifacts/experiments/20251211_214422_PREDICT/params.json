@@ -1,0 +1,6 @@
+{
+    "mode": "predict",
+    "model_name": "all",
+    "optimize": true,
+    "test_size": 0.2
+}
