@@ -657,7 +657,7 @@ pytest tests/test_models/ -v                # Models module
 pytest tests/test_data/test_preprocessor.py -v
 
 # Chạy test case cụ thể
-pytest tests/test_data/test_preprocessor.py::TestDataPreprocessor::test_clean_data -v
+pytest tests/test_data/test_preprocessor.py::DataPreprocessor::test_clean_data_basic -v
 ```
 ## 📖 Hướng dẫn Đọc & Phân tích Output
 Sau khi chạy pipeline, toàn bộ kết quả, log và model sẽ được lưu tự động vào thư mục `artifacts/`. Dưới đây là cấu trúc tổ chức file đầu ra:
